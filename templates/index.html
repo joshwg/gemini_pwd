@@ -1,0 +1,509 @@
+<!-- templates/index.html -->
+{{define "title"}}Dashboard{{end}}
+
+{{define "content"}}
+<nav class="bg-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+            <div class="flex-shrink-0">
+                <span class="text-xl font-bold">Password Manager</span>
+            </div>
+            <div class="flex items-center">
+                <span class="mr-4">Welcome, {{.Username}}!</span>
+                {{if .IsAdmin}}
+                <a href="/users" class="text-gray-500 hover:text-gray-700 mr-4">Users</a>
+                {{end}}
+                <button id="changeMyPasswordBtn" class="text-gray-500 hover:text-gray-700 mr-4">Change Password</button>
+                <a href="/logout" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Logout</a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<main class="p-8">
+    <h1 class="text-3xl font-bold mb-6">Your Passwords</h1>
+
+    <div class="flex flex-col md:flex-row mb-6 items-center">
+        <input type="text" id="searchPassword" class="shadow appearance-none border rounded w-full md:w-1/3 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Search by site, username, or tags...">
+        <button id="createPasswordBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-0 md:ml-4 mt-4 md:mt-0 focus:outline-none focus:shadow-outline">
+            <i class="fas fa-plus mr-2"></i>New Password
+        </button>
+    </div>
+
+    <!-- Password Entries List -->
+    <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+        <table class="min-w-full bg-white rounded-lg overflow-hidden">
+            <thead class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
+                <tr>
+                    <th class="py-3 px-6 text-left">Site</th>
+                    <th class="py-3 px-6 text-left">Username</th>
+                    <th class="py-3 px-6 text-left">Tags</th>
+                    <th class="py-3 px-6 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="passwordTableBody" class="text-gray-600 text-sm font-light">
+                <!-- Passwords will be populated here by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Tag Management -->
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-2xl font-semibold">Your Tags</h2>
+            <button id="createTagBtn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                <i class="fas fa-plus mr-2"></i>New Tag
+            </button>
+        </div>
+        <div id="tagList" class="flex flex-wrap gap-2">
+            <!-- Tags will be populated here by JavaScript -->
+        </div>
+    </div>
+</main>
+
+<!-- Password Modal (Create/Edit) -->
+<div id="passwordModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-full md:w-1/2 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <h3 class="text-lg leading-6 font-medium text-gray-900" id="passwordModalTitle"></h3>
+            <div class="mt-2 px-7 py-3">
+                <form id="passwordForm">
+                    <input type="hidden" id="passwordID" name="id">
+                    <div class="mb-4">
+                        <label for="passwordSite" class="block text-gray-700 text-sm font-bold mb-2">Site</label>
+                        <input type="text" id="passwordSite" name="site" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="passwordUsername" class="block text-gray-700 text-sm font-bold mb-2">Username</label>
+                        <input type="text" id="passwordUsername" name="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                    </div>
+                    <div class="mb-4 relative">
+                        <label for="passwordValue" class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                        <input type="password" id="passwordValue" name="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                        <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="passwordValue">
+                            <i class="fas fa-eye"></i>
+                        </span>
+                    </div>
+                    <div class="mb-4">
+                        <label for="passwordNotes" class="block text-gray-700 text-sm font-bold mb-2">Notes</label>
+                        <textarea id="passwordNotes" name="notes" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Tags</label>
+                        <div id="passwordTagsContainer" class="flex flex-wrap gap-2 p-2 border rounded-md">
+                            <!-- Tags associated with the password will be dropped here -->
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Save</button>
+                        <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tag Modal (Create/Edit) -->
+<div id="tagModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <h3 class="text-lg leading-6 font-medium text-gray-900" id="tagModalTitle"></h3>
+            <div class="mt-2 px-7 py-3">
+                <form id="tagForm">
+                    <input type="hidden" id="tagID" name="id">
+                    <div class="mb-4">
+                        <label for="tagName" class="block text-gray-700 text-sm font-bold mb-2">Tag Name</label>
+                        <input type="text" id="tagName" name="name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="tagDescription" class="block text-gray-700 text-sm font-bold mb-2">Description</label>
+                        <input type="text" id="tagDescription" name="description" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    </div>
+                    <div class="mb-4">
+                        <label for="tagColor" class="block text-gray-700 text-sm font-bold mb-2">Color</label>
+                        <input type="color" id="tagColor" name="color" class="w-full h-10 border rounded focus:outline-none focus:shadow-outline">
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Save</button>
+                        <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Change My Password Modal -->
+<div id="changeMyPasswordModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">Change Your Password</h3>
+            <div class="mt-2 px-7 py-3">
+                <form id="changeMyPasswordForm">
+                    <div class="relative mb-4">
+                        <label for="currentPassword" class="block text-gray-700 text-sm font-bold mb-2">Current Password</label>
+                        <input type="password" id="currentPassword" name="currentPassword" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                        <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="currentPassword">
+                            <i class="fas fa-eye"></i>
+                        </span>
+                    </div>
+                    <div class="relative mb-4">
+                        <label for="newPassword" class="block text-gray-700 text-sm font-bold mb-2">New Password</label>
+                        <input type="password" id="newPassword" name="newPassword" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                        <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="newPassword">
+                            <i class="fas fa-eye"></i>
+                        </span>
+                    </div>
+                    <div class="relative mb-6">
+                        <label for="confirmNewPassword" class="block text-gray-700 text-sm font-bold mb-2">Confirm New Password</label>
+                        <input type="password" id="confirmNewPassword" name="confirmNewPassword" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                        <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="confirmNewPassword">
+                            <i class="fas fa-eye"></i>
+                        </span>
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Change Password</button>
+                        <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_ORIGIN = window.location.origin;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const passwordTableBody = document.getElementById('passwordTableBody');
+        const searchPasswordInput = document.getElementById('searchPassword');
+        const createPasswordBtn = document.getElementById('createPasswordBtn');
+        const passwordModal = document.getElementById('passwordModal');
+        const passwordForm = document.getElementById('passwordForm');
+        const passwordModalTitle = document.getElementById('passwordModalTitle');
+        const passwordID = document.getElementById('passwordID');
+        const passwordSite = document.getElementById('passwordSite');
+        const passwordUsername = document.getElementById('passwordUsername');
+        const passwordValue = document.getElementById('passwordValue');
+        const passwordNotes = document.getElementById('passwordNotes');
+        const passwordTagsContainer = document.getElementById('passwordTagsContainer');
+
+        const tagListContainer = document.getElementById('tagList');
+        const createTagBtn = document.getElementById('createTagBtn');
+        const tagModal = document.getElementById('tagModal');
+        const tagForm = document.getElementById('tagForm');
+        const tagModalTitle = document.getElementById('tagModalTitle');
+        const tagID = document.getElementById('tagID');
+        const tagName = document.getElementById('tagName');
+        const tagDescription = document.getElementById('tagDescription');
+        const tagColor = document.getElementById('tagColor');
+
+        let allTags = [];
+        let draggedTag = null;
+        
+        // Fetch and render passwords and tags on page load
+        fetchPasswords();
+        fetchTags();
+
+        // Toggle password visibility
+        document.querySelectorAll('.toggle-password-visibility').forEach(toggle => {
+            toggle.addEventListener('click', (e) => {
+                const targetId = e.target.closest('.toggle-password-visibility').dataset.target;
+                const passwordInput = document.getElementById(targetId);
+                const icon = e.target.closest('.toggle-password-visibility').querySelector('i');
+                
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                } else {
+                    passwordInput.type = 'password';
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
+            });
+        });
+
+        // Search functionality
+        searchPasswordInput.addEventListener('keyup', () => {
+            fetchPasswords(searchPasswordInput.value);
+        });
+
+        // Open password creation modal
+        createPasswordBtn.addEventListener('click', () => {
+            passwordModalTitle.textContent = 'Create New Password';
+            passwordForm.reset();
+            passwordID.value = '';
+            passwordTagsContainer.innerHTML = '';
+            passwordModal.classList.remove('hidden');
+        });
+
+        // Open tag creation modal
+        createTagBtn.addEventListener('click', () => {
+            tagModalTitle.textContent = 'Create New Tag';
+            tagForm.reset();
+            tagID.value = '';
+            tagModal.classList.remove('hidden');
+        });
+
+        // Handle form submissions for passwords
+        passwordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const tags = Array.from(passwordTagsContainer.querySelectorAll('.tag-item')).map(tag => tag.dataset.name);
+            
+            const data = {
+                site: passwordSite.value,
+                username: passwordUsername.value,
+                password: passwordValue.value,
+                notes: passwordNotes.value,
+                tags: tags
+            };
+
+            const method = passwordID.value ? 'PUT' : 'POST';
+            const url = passwordID.value ? `${API_ORIGIN}/api/passwords?id=${passwordID.value}` : `${API_ORIGIN}/api/passwords`;
+
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                console.log('Password saved successfully!');
+                passwordModal.classList.add('hidden');
+                fetchPasswords();
+            } else {
+                console.error('Failed to save password.');
+                const errorText = await response.text();
+                alert('Error: ' + errorText);
+            }
+        });
+
+        // Handle form submissions for tags
+        tagForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                name: tagName.value,
+                description: tagDescription.value,
+                color: tagColor.value
+            };
+
+            const method = tagID.value ? 'PUT' : 'POST';
+            const url = tagID.value ? `${API_ORIGIN}/api/tags?id=${tagID.value}` : `${API_ORIGIN}/api/tags`;
+
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                console.log('Tag saved successfully!');
+                tagModal.classList.add('hidden');
+                fetchTags();
+            } else {
+                console.error('Failed to save tag.');
+                const errorText = await response.text();
+                alert('Error: ' + errorText);
+            }
+        });
+
+        // Event delegation for table and tag list buttons
+        document.addEventListener('click', async (e) => {
+            if (e.target.closest('.delete-password-btn')) {
+                const id = e.target.closest('.delete-password-btn').dataset.id;
+                if (confirm('Are you sure you want to delete this password?')) {
+                    const response = await fetch(`${API_ORIGIN}/api/passwords?id=${id}`, { method: 'DELETE' });
+                    if (response.ok) {
+                        fetchPasswords();
+                    } else {
+                        alert('Failed to delete password.');
+                    }
+                }
+            } else if (e.target.closest('.edit-password-btn')) {
+                const id = e.target.closest('.edit-password-btn').dataset.id;
+                fetchPasswordByID(id);
+            } else if (e.target.closest('.copy-password-btn')) {
+                const id = e.target.closest('.copy-password-btn').dataset.id;
+                copyPassword(id);
+            } else if (e.target.closest('.delete-tag-btn')) {
+                const id = e.target.closest('.delete-tag-btn').dataset.id;
+                if (confirm('Are you sure you want to delete this tag?')) {
+                    const response = await fetch(`${API_ORIGIN}/api/tags?id=${id}`, { method: 'DELETE' });
+                    if (response.ok) {
+                        fetchTags();
+                    } else {
+                        alert('Failed to delete tag.');
+                    }
+                }
+            } else if (e.target.closest('.edit-tag-btn')) {
+                const id = e.target.closest('.edit-tag-btn').dataset.id;
+                const tag = allTags.find(t => t.id == id);
+                if (tag) {
+                    tagModalTitle.textContent = 'Edit Tag';
+                    tagID.value = tag.id;
+                    tagName.value = tag.name;
+                    tagDescription.value = tag.description;
+                    tagColor.value = tag.color;
+                    tagModal.classList.remove('hidden');
+                }
+            } else if (e.target.closest('.close-modal')) {
+                e.target.closest('.fixed').classList.add('hidden');
+            }
+        });
+
+        // Drag and drop for tags
+        tagListContainer.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('tag-item')) {
+                draggedTag = e.target;
+                e.dataTransfer.setData('text/plain', e.target.dataset.id);
+            }
+        });
+
+        passwordTagsContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        passwordTagsContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (draggedTag) {
+                const tagId = draggedTag.dataset.id;
+                const tagName = draggedTag.dataset.name;
+                const tagColor = draggedTag.dataset.color;
+                
+                // Prevent duplicate tags
+                if (!passwordTagsContainer.querySelector(`[data-id="${tagId}"]`)) {
+                    const tagElement = document.createElement('span');
+                    tagElement.className = 'tag-item text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full last:mr-0 mr-1 cursor-pointer';
+                    tagElement.style.backgroundColor = tagColor;
+                    tagElement.style.color = '#FFFFFF';
+                    tagElement.dataset.id = tagId;
+                    tagElement.dataset.name = tagName;
+                    tagElement.draggable = true;
+                    tagElement.textContent = tagName;
+                    tagElement.addEventListener('click', () => tagElement.remove());
+                    passwordTagsContainer.appendChild(tagElement);
+                }
+                draggedTag = null;
+            }
+        });
+
+        // Helper functions
+        async function fetchPasswords(query = '') {
+            try {
+                const response = await fetch(`${API_ORIGIN}/api/passwords?q=${encodeURIComponent(query)}`);
+                if (!response.ok) throw new Error('Failed to fetch passwords.');
+                const passwords = await response.json();
+                renderPasswords(passwords);
+            } catch (e) {
+                console.error(e);
+                alert(e.message);
+            }
+        }
+        
+        async function fetchPasswordByID(id) {
+            try {
+                const response = await fetch(`${API_ORIGIN}/api/passwords?id=${id}`);
+                if (!response.ok) throw new Error('Failed to fetch password.');
+                const password = await response.json();
+                passwordModalTitle.textContent = 'Edit Password';
+                passwordID.value = password.id;
+                passwordSite.value = password.site;
+                passwordUsername.value = password.username;
+                passwordNotes.value = password.notes;
+                
+                // Clear and populate tags
+                passwordTagsContainer.innerHTML = '';
+                password.tags.forEach(tag => {
+                    const tagElement = document.createElement('span');
+                    tagElement.className = 'tag-item text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full last:mr-0 mr-1 cursor-pointer';
+                    tagElement.style.backgroundColor = tag.color;
+                    tagElement.style.color = '#FFFFFF';
+                    tagElement.dataset.id = tag.id;
+                    tagElement.dataset.name = tag.name;
+                    tagElement.draggable = true;
+                    tagElement.textContent = tag.name;
+                    tagElement.addEventListener('click', () => tagElement.remove());
+                    passwordTagsContainer.appendChild(tagElement);
+                });
+                passwordModal.classList.remove('hidden');
+            } catch (e) {
+                console.error(e);
+                alert(e.message);
+            }
+        }
+
+        async function fetchTags() {
+            try {
+                const response = await fetch(`${API_ORIGIN}/api/tags`);
+                if (!response.ok) throw new Error('Failed to fetch tags.');
+                allTags = await response.json();
+                renderTags(allTags);
+            } catch (e) {
+                console.error(e);
+                alert(e.message);
+            }
+        }
+
+        function renderPasswords(passwords) {
+            passwordTableBody.innerHTML = '';
+            passwords.forEach(p => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-gray-200 hover:bg-gray-100';
+                row.innerHTML = `
+                    <td class="py-3 px-6 text-left whitespace-nowrap">${p.site}</td>
+                    <td class="py-3 px-6 text-left">${p.username}</td>
+                    <td class="py-3 px-6 text-left">
+                        ${p.tags.map(tag => `<span class="tag-item text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full last:mr-0 mr-1" style="background-color: ${tag.color}; color: #FFFFFF;">${tag.name}</span>`).join('')}
+                    </td>
+                    <td class="py-3 px-6 text-center">
+                        <div class="flex item-center justify-center">
+                            <button class="edit-password-btn w-4 mr-2 transform hover:text-blue-500 hover:scale-110" data-id="${p.id}"><i class="fas fa-edit"></i></button>
+                            <button class="copy-password-btn w-4 mr-2 transform hover:text-green-500 hover:scale-110" data-id="${p.id}"><i class="fas fa-copy"></i></button>
+                            <button class="delete-password-btn w-4 mr-2 transform hover:text-red-500 hover:scale-110" data-id="${p.id}"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                    </td>
+                `;
+                passwordTableBody.appendChild(row);
+            });
+        }
+
+        function renderTags(tags) {
+            tagListContainer.innerHTML = '';
+            tags.forEach(tag => {
+                const tagElement = document.createElement('span');
+                tagElement.className = 'tag-item text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full last:mr-0 mr-1 cursor-grab';
+                tagElement.style.backgroundColor = tag.color;
+                tagElement.style.color = '#FFFFFF';
+                tagElement.dataset.id = tag.id;
+                tagElement.dataset.name = tag.name;
+                tagElement.dataset.color = tag.color;
+                tagElement.draggable = true;
+                tagElement.innerHTML = `${tag.name} <button class="edit-tag-btn ml-1" data-id="${tag.id}"><i class="fas fa-pen text-white text-xs"></i></button> <button class="delete-tag-btn ml-1" data-id="${tag.id}"><i class="fas fa-times-circle text-white text-xs"></i></button>`;
+                tagListContainer.appendChild(tagElement);
+            });
+        }
+        
+        async function copyPassword(id) {
+            // Need a new API endpoint to get password data and decrypt it
+            try {
+                const response = await fetch(`${API_ORIGIN}/api/passwords?id=${id}&action=copy`);
+                if (!response.ok) throw new Error('Failed to fetch password for copying.');
+                const password = await response.text();
+                // Copy to clipboard
+                const tempInput = document.createElement('input');
+                tempInput.value = password;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+                alert('Password copied to clipboard!');
+            } catch (e) {
+                console.error(e);
+                alert(e.message);
+            }
+        }
+    });
+</script>
+{{end}}
