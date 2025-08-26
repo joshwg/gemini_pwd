@@ -279,7 +279,7 @@
                 if (!response.ok) {
                     throw new Error('Failed to fetch users');
                 }
-                const users = await response.json();
+                const users = await response.json() || [];
                 userTableBody.innerHTML = ''; // Clear existing rows
                 users.forEach(user => {
                     const row = document.createElement('tr');

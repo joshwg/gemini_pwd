@@ -63,12 +63,14 @@
                     </div>
                     <!-- Color Palette -->
                     <div class="flex flex-wrap gap-2 justify-center mt-4 p-2 bg-gray-100 rounded-md" id="colorPalette">
-                        <!-- 20 pre-defined colors -->
+                        <!-- 24 pre-defined colors -->
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-red-500" data-color="#ef4444"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-orange-500" data-color="#f97316"></div>
+                        <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-amber-500" data-color="#f59e0b"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-yellow-500" data-color="#eab308"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-lime-500" data-color="#84cc16"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-green-500" data-color="#22c55e"></div>
+                        <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-emerald-500" data-color="#10b981"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-teal-500" data-color="#14b8a6"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-cyan-500" data-color="#06b6d4"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-sky-500" data-color="#0ea5e9"></div>
@@ -76,14 +78,16 @@
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-indigo-500" data-color="#6366f1"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-violet-500" data-color="#8b5cf6"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-purple-500" data-color="#a855f7"></div>
-                        <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-fuchsia-500" data-color="#e879f9"></div>
+                        <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-fuchsia-500" data-color="#d946ef"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-pink-500" data-color="#ec4899"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-rose-500" data-color="#f43f5e"></div>
+                        <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-red-700" data-color="#b91c1c"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-gray-500" data-color="#6b7280"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-stone-500" data-color="#78716c"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-zinc-500" data-color="#71717a"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-slate-500" data-color="#64748b"></div>
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-neutral-500" data-color="#737373"></div>
+                        <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500 bg-gray-800" data-color="#1f2937"></div>
                     </div>
                     <div class="mt-4">
                         <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Save</button>
@@ -179,9 +183,20 @@
         async function fetchTags() {
             try {
                 const response = await fetch(`${API_ORIGIN}/api/tags`);
-                if (!response.ok) throw new Error('Failed to fetch tags.');
-                const tags = await response.json();
-                renderTags(tags);
+                if (!response.ok) {
+                    if (response.redirected) {
+                        window.location.reload();
+                        return;
+                    }
+                    throw new Error('Failed to fetch tags.');
+                }
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const tags = await response.json();
+                    renderTags(tags);
+                } else {
+                    window.location.reload();
+                }
             } catch (e) {
                 console.error(e);
                 alert(e.message);
@@ -191,14 +206,25 @@
         async function fetchTagByID(id) {
             try {
                 const response = await fetch(`${API_ORIGIN}/api/tags?id=${id}`);
-                if (!response.ok) throw new Error('Failed to fetch tag.');
-                const tag = await response.json();
-                tagModalTitle.textContent = 'Edit Tag';
-                tagID.value = tag.id;
-                tagName.value = tag.name;
-                tagDescription.value = tag.description;
-                tagColor.value = tag.color;
-                tagModal.classList.remove('hidden');
+                if (!response.ok) {
+                    if (response.redirected) {
+                        window.location.reload();
+                        return;
+                    }
+                    throw new Error('Failed to fetch tag.');
+                }
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const tag = await response.json();
+                    tagModalTitle.textContent = 'Edit Tag';
+                    tagID.value = tag.id;
+                    tagName.value = tag.name;
+                    tagDescription.value = tag.description;
+                    tagColor.value = tag.color;
+                    tagModal.classList.remove('hidden');
+                } else {
+                    window.location.reload();
+                }
             } catch (e) {
                 console.error(e);
                 alert(e.message);

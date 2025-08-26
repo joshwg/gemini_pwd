@@ -209,6 +209,19 @@ func getTags(userID int) ([]Tag, error) {
 	return tags, nil
 }
 
+// getTagByID retrieves a single tag by its ID for a specific user.
+func getTagByID(userID, tagID int) (*Tag, error) {
+	var tag Tag
+	err := db.QueryRow("SELECT id, name, description, color FROM tags WHERE id = ? AND user_id = ?", tagID, userID).Scan(&tag.ID, &tag.Name, &tag.Description, &tag.Color)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("tag not found or access denied")
+		}
+		return nil, fmt.Errorf("failed to query tag: %w", err)
+	}
+	return &tag, nil
+}
+
 // createTag creates a new tag for a user.
 func createTag(userID int, name, description, color string) error {
 	// Check for existing tag case-insensitively
@@ -301,6 +314,9 @@ func getPasswords(userID int, query string) ([]PasswordEntry, error) {
 	}
 
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return []PasswordEntry{}, nil // Return empty slice if no rows found
+		}
 		return nil, fmt.Errorf("failed to query passwords: %w", err)
 	}
 	defer rows.Close()

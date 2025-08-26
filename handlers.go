@@ -69,6 +69,17 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 	parseTemplate(w, "index.html", user)
 }
 
+// tagsHandler serves the tag management page.
+func tagsHandler(w http.ResponseWriter, r *http.Request) {
+	user, ok := r.Context().Value("user").(*User)
+	if !ok || user == nil {
+		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	parseTemplate(w, "tags.html", user)
+}
+
 // usersHandler serves the user management page (formerly admin).
 func usersHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := r.Context().Value("user").(*User)
@@ -335,12 +346,29 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		tags, err := getTags(currentUser.ID)
-		if err != nil {
-			http.Error(w, "Failed to retrieve tags", http.StatusInternalServerError)
-			return
+		tagIDStr := r.URL.Query().Get("id")
+		if tagIDStr != "" {
+			// Get a single tag by ID
+			tagID, err := strconv.Atoi(tagIDStr)
+			if err != nil {
+				http.Error(w, "Invalid tag ID", http.StatusBadRequest)
+				return
+			}
+			tag, err := getTagByID(currentUser.ID, tagID)
+			if err != nil {
+				http.Error(w, "Failed to retrieve tag", http.StatusNotFound)
+				return
+			}
+			json.NewEncoder(w).Encode(tag)
+		} else {
+			// Get all tags for the user
+			tags, err := getTags(currentUser.ID)
+			if err != nil {
+				http.Error(w, "Failed to retrieve tags", http.StatusInternalServerError)
+				return
+			}
+			json.NewEncoder(w).Encode(tags)
 		}
-		json.NewEncoder(w).Encode(tags)
 	case http.MethodPost:
 		var data struct {
 			Name        string `json:"name"`
@@ -353,6 +381,14 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if data.Name == "" {
 			http.Error(w, "Tag name is required", http.StatusBadRequest)
+			return
+		}
+		if len(data.Name) > 40 {
+			http.Error(w, "Tag name must be 40 characters or less.", http.StatusBadRequest)
+			return
+		}
+		if len(data.Description) > 255 {
+			http.Error(w, "Tag description must be 255 characters or less.", http.StatusBadRequest)
 			return
 		}
 		if err := createTag(currentUser.ID, data.Name, data.Description, data.Color); err != nil {
@@ -373,6 +409,14 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if data.Name == "" {
 			http.Error(w, "Tag name is required", http.StatusBadRequest)
+			return
+		}
+		if len(data.Name) > 40 {
+			http.Error(w, "Tag name must be 40 characters or less.", http.StatusBadRequest)
+			return
+		}
+		if len(data.Description) > 255 {
+			http.Error(w, "Tag description must be 255 characters or less.", http.StatusBadRequest)
 			return
 		}
 		if err := updateTag(currentUser.ID, data.ID, data.Name, data.Description, data.Color); err != nil {
