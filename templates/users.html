@@ -1,0 +1,315 @@
+<!-- templates/admin.html -->
+{{define "title"}}Admin{{end}}
+
+{{define "content"}}
+<nav class="bg-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+            <div class="flex-shrink-0">
+                <span class="text-xl font-bold">Password Manager - Admin</span>
+            </div>
+            <div class="flex items-center">
+                <a href="/dashboard" class="text-gray-500 hover:text-gray-700 mr-4">Dashboard</a>
+                <a href="/logout" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Logout</a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<main class="p-8">
+    <h1 class="text-3xl font-bold mb-6">User Management</h1>
+
+    <!-- User Creation Form -->
+    <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+        <h2 class="text-2xl font-semibold mb-4">Create New User</h2>
+        <form id="createUserForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label for="newUsername" class="block text-gray-700 text-sm font-bold mb-2">Username</label>
+                <input type="text" id="newUsername" name="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+            </div>
+            <div class="relative">
+                <label for="newPassword" class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                <input type="password" id="newPassword" name="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="newPassword">
+                    <i class="fas fa-eye"></i>
+                </span>
+            </div>
+            <div class="flex items-center mt-6">
+                <label for="newIsAdmin" class="text-gray-700 mr-2">Admin?</label>
+                <input type="checkbox" id="newIsAdmin" name="isAdmin" class="form-checkbox h-5 w-5 text-blue-600">
+                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-auto focus:outline-none focus:shadow-outline">Create User</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- User List -->
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h2 class="text-2xl font-semibold mb-4">Existing Users</h2>
+        <table class="min-w-full bg-white rounded-lg overflow-hidden">
+            <thead class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
+                <tr>
+                    <th class="py-3 px-6 text-left">Username</th>
+                    <th class="py-3 px-6 text-left">Admin</th>
+                    <th class="py-3 px-6 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="userTableBody" class="text-gray-600 text-sm font-light">
+                <!-- User data will be populated here by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div id="editUserModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Edit User</h3>
+                <div class="mt-2 px-7 py-3">
+                    <form id="editUserForm">
+                        <div class="mb-4">
+                            <label for="editUsername" class="block text-gray-700 text-sm font-bold mb-2">Username</label>
+                            <input type="text" id="editUsername" name="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                        </div>
+                        <div class="mb-6">
+                            <label for="editIsAdmin" class="text-gray-700 mr-2">Admin?</label>
+                            <input type="checkbox" id="editIsAdmin" name="isAdmin" class="form-checkbox h-5 w-5 text-blue-600">
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Save Changes</button>
+                            <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div id="changePasswordModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Change Password for <span id="changePasswordUser" class="font-bold"></span></h3>
+                <div class="mt-2 px-7 py-3">
+                    <form id="changePasswordForm">
+                        <div class="relative mb-4">
+                            <label for="newPasswordAdmin" class="block text-gray-700 text-sm font-bold mb-2">New Password</label>
+                            <input type="password" id="newPasswordAdmin" name="newPassword" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                            <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="newPasswordAdmin">
+                                <i class="fas fa-eye"></i>
+                            </span>
+                        </div>
+                        <div class="relative mb-6">
+                            <label for="confirmPasswordAdmin" class="block text-gray-700 text-sm font-bold mb-2">Confirm Password</label>
+                            <input type="password" id="confirmPasswordAdmin" name="confirmPassword" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                            <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="confirmPasswordAdmin">
+                                <i class="fas fa-eye"></i>
+                            </span>
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Change Password</button>
+                            <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const userTableBody = document.getElementById('userTableBody');
+        const createUserForm = document.getElementById('createUserForm');
+        const editUserModal = document.getElementById('editUserModal');
+        const editUserForm = document.getElementById('editUserForm');
+        const changePasswordModal = document.getElementById('changePasswordModal');
+        const changePasswordForm = document.getElementById('changePasswordForm');
+        let currentUsername = null;
+
+        // Toggle password visibility
+        document.querySelectorAll('.toggle-password-visibility').forEach(toggle => {
+            toggle.addEventListener('click', (e) => {
+                const targetId = e.target.closest('.toggle-password-visibility').dataset.target;
+                const passwordInput = document.getElementById(targetId);
+                const icon = e.target.closest('.toggle-password-visibility').querySelector('i');
+                
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                } else {
+                    passwordInput.type = 'password';
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
+            });
+        });
+
+        // Fetch and render users on page load
+        fetchUsers();
+
+        // Event listener for user creation form submission
+        createUserForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                username: formData.get('username'),
+                password: formData.get('password'),
+                isAdmin: formData.get('isAdmin') === 'on'
+            };
+
+            const response = await fetch(`${window.location.origin}/api/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                console.log('User created successfully!');
+                e.target.reset(); // Clear form fields
+                fetchUsers(); // Refresh the user list
+            } else {
+                console.error('Failed to create user.');
+                const errorText = await response.text();
+                alert('Error: ' + errorText);
+            }
+        });
+
+        // Event delegation for table buttons
+        userTableBody.addEventListener('click', async (e) => {
+            if (e.target.closest('.delete-btn')) {
+                const username = e.target.closest('.delete-btn').dataset.username;
+                if (confirm(`Are you sure you want to delete user "${username}"?`)) {
+                    const response = await fetch(`${window.location.origin}/api/users?username=${username}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (response.ok) {
+                        console.log('User deleted successfully!');
+                        fetchUsers(); // Refresh the user list
+                    } else {
+                        console.error('Failed to delete user.');
+                        const errorText = await response.text();
+                        alert('Error: ' + errorText);
+                    }
+                }
+            } else if (e.target.closest('.edit-btn')) {
+                currentUsername = e.target.closest('.edit-btn').dataset.username;
+                const isAdmin = e.target.closest('.edit-btn').dataset.isadmin === 'true';
+                document.getElementById('editUsername').value = currentUsername;
+                document.getElementById('editIsAdmin').checked = isAdmin;
+                editUserModal.classList.remove('hidden');
+            } else if (e.target.closest('.change-password-btn')) {
+                currentUsername = e.target.closest('.change-password-btn').dataset.username;
+                document.getElementById('changePasswordUser').textContent = currentUsername;
+                changePasswordModal.classList.remove('hidden');
+            }
+        });
+
+        // Event listener for edit user form submission
+        editUserForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                username: currentUsername, // The user to update
+                newUsername: formData.get('username'),
+                isAdmin: formData.get('isAdmin') === 'on'
+            };
+
+            const response = await fetch(`${window.location.origin}/api/users`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                console.log('User updated successfully!');
+                editUserModal.classList.add('hidden');
+                fetchUsers();
+            } else {
+                console.error('Failed to update user.');
+                const errorText = await response.text();
+                alert('Error: ' + errorText);
+            }
+        });
+
+        // Event listener for change password form submission
+        changePasswordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newPassword = document.getElementById('newPasswordAdmin').value;
+            const confirmPassword = document.getElementById('confirmPasswordAdmin').value;
+
+            if (newPassword !== confirmPassword) {
+                alert('Passwords do not match.');
+                return;
+            }
+
+            const data = {
+                username: currentUsername,
+                newPassword: newPassword
+            };
+
+            const response = await fetch(`${window.location.origin}/api/users`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                console.log('Password changed successfully!');
+                changePasswordModal.classList.add('hidden');
+            } else {
+                console.error('Failed to change password.');
+                const errorText = await response.text();
+                alert('Error: ' + errorText);
+            }
+        });
+
+        // Close modals
+        document.querySelectorAll('.close-modal').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.target.closest('.fixed').classList.add('hidden');
+            });
+        });
+
+        // Function to fetch users and populate the table
+        async function fetchUsers() {
+            try {
+                const response = await fetch(`${window.location.origin}/api/users`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch users');
+                }
+                const users = await response.json();
+                userTableBody.innerHTML = ''; // Clear existing rows
+                users.forEach(user => {
+                    const row = document.createElement('tr');
+                    row.className = 'border-b border-gray-200 hover:bg-gray-100';
+                    row.innerHTML = `
+                        <td class="py-3 px-6 text-left whitespace-nowrap">${user.Username}</td>
+                        <td class="py-3 px-6 text-left">
+                            <span class="bg-${user.IsAdmin ? 'green' : 'red'}-200 text-${user.IsAdmin ? 'green' : 'red'}-600 py-1 px-3 rounded-full text-xs">${user.IsAdmin ? 'Yes' : 'No'}</span>
+                        </td>
+                        <td class="py-3 px-6 text-center">
+                            <div class="flex item-center justify-center">
+                                <button class="edit-btn w-4 mr-2 transform hover:text-blue-500 hover:scale-110" data-username="${user.Username}" data-isadmin="${user.IsAdmin}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="change-password-btn w-4 mr-2 transform hover:text-orange-500 hover:scale-110" data-username="${user.Username}">
+                                    <i class="fas fa-key"></i>
+                                </button>
+                                <button class="delete-btn w-4 mr-2 transform hover:text-red-500 hover:scale-110" data-username="${user.Username}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    userTableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error(error);
+                alert('Failed to load users.');
+            }
+        }
+    });
+</script>
+{{end}}
