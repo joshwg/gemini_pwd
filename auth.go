@@ -46,8 +46,8 @@ func clearSession(w http.ResponseWriter, r *http.Request) {
 	}
 	delete(sessions, c.Value)
 	http.SetCookie(w, &http.Cookie{
-		Name:   "session_token",
-		Value:  "",
+		Name:    "session_token",
+		Value:   "",
 		Expires: time.Unix(0, 0),
 		MaxAge: -1,
 	})

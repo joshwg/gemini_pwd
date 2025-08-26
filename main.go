@@ -14,18 +14,19 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// Public routes (no authentication required)
+	// Public routes
 	mux.HandleFunc("/", loginHandler)
 	mux.HandleFunc("/login", loginHandler)
+	mux.HandleFunc("/test", testHandler)
 	
 	// Protected routes (require authentication)
-	// We'll apply the authMiddleware to these routes.
 	mux.HandleFunc("/dashboard", authMiddleware(dashboardHandler))
 	mux.HandleFunc("/logout", authMiddleware(logoutHandler))
-	// Updated the route from /admin to /users
-	mux.HandleFunc("/users", authMiddleware(adminHandler))
+	mux.HandleFunc("/users", authMiddleware(usersHandler))
 	mux.HandleFunc("/api/users", authMiddleware(usersAPIHandler))
 	mux.HandleFunc("/api/change-password", authMiddleware(changeMyPasswordHandler))
+	mux.HandleFunc("/api/passwords", authMiddleware(passwordsAPIHandler))
+	mux.HandleFunc("/api/tags", authMiddleware(tagsAPIHandler))
 
 	// Start the server
 	log.Println("Starting server on :8080")
