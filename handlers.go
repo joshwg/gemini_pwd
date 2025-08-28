@@ -81,6 +81,17 @@ func usersHandler(w http.ResponseWriter, r *http.Request) {
 	parseTemplate(w, "users.html", user)
 }
 
+// tagsHandler serves the tag management page.
+func tagsHandler(w http.ResponseWriter, r *http.Request) {
+	user, ok := r.Context().Value("user").(*User)
+	if !ok || user == nil {
+		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	parseTemplate(w, "tags.html", user)
+}
+
 // logoutHandler clears the user's session.
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	clearSession(w, r)
@@ -251,6 +262,7 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query().Get("q")
 		passwords, err := getPasswords(currentUser.ID, query)
 		if err != nil {
+			log.Printf("Error retrieving passwords for user %d: %v", currentUser.ID, err)
 			http.Error(w, "Failed to retrieve passwords", http.StatusInternalServerError)
 			return
 		}

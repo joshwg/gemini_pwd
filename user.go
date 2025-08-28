@@ -301,6 +301,9 @@ func getPasswords(userID int, query string) ([]PasswordEntry, error) {
 	}
 
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return []PasswordEntry{}, nil // Return empty slice if no rows found
+		}
 		return nil, fmt.Errorf("failed to query passwords: %w", err)
 	}
 	defer rows.Close()
@@ -345,7 +348,7 @@ func createPasswordEntry(userID int, site, username, password, notes string, tag
 	}
 	defer tx.Rollback()
 	
-	res, err := tx.Exec("INSERT INTO password_entries (user_id, site, username, password_encrypted, notes_encrypted) VALUES (?, ?, ?, ?, ?)", userID, site, username, encryptedPassword, encryptedNotes)
+	res, err := tx.Exec("INSERT INTO password_entries (user_id, site, username, password_encrypted, notes_encrypted, created_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)", userID, site, username, encryptedPassword, encryptedNotes)
 	if err != nil {
 		return fmt.Errorf("failed to insert password entry: %w", err)
 	}

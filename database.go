@@ -45,7 +45,7 @@ func initDB(filepath string) {
 		username TEXT NOT NULL,
 		password_encrypted BLOB,
 		notes_encrypted BLOB,
-		salt BLOB,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
 	CREATE TABLE IF NOT EXISTS entry_tags (

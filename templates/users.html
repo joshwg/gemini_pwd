@@ -210,26 +210,51 @@
         editUserForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
-            const data = {
-                username: currentUsername, // The user to update
-                newUsername: formData.get('username'),
-                isAdmin: formData.get('isAdmin') === 'on'
-            };
+            const newUsername = formData.get('username');
+            const isAdmin = formData.get('isAdmin') === 'on';
 
-            const response = await fetch(`${window.location.origin}/api/users`, {
+            let updatePromises = [];
+
+            // Update username if it has changed
+            if (newUsername !== currentUsername) {
+                const renamePayload = { username: currentUsername, newUsername: newUsername };
+                const renamePromise = fetch(`${window.location.origin}/api/users`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(renamePayload)
+                });
+                updatePromises.push(renamePromise);
+            }
+
+            // Always update admin status
+            const adminPayload = { username: newUsername, isAdmin: isAdmin };
+            const adminPromise = fetch(`${window.location.origin}/api/users`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: JSON.stringify(adminPayload)
             });
+            updatePromises.push(adminPromise);
 
-            if (response.ok) {
-                console.log('User updated successfully!');
-                editUserModal.classList.add('hidden');
-                fetchUsers();
-            } else {
-                console.error('Failed to update user.');
-                const errorText = await response.text();
-                alert('Error: ' + errorText);
+            try {
+                const responses = await Promise.all(updatePromises);
+                const allOk = responses.every(res => res.ok);
+
+                if (allOk) {
+                    console.log('User updated successfully!');
+                    editUserModal.classList.add('hidden');
+                    fetchUsers();
+                } else {
+                    console.error('Failed to update user.');
+                    for (const res of responses) {
+                        if (!res.ok) {
+                            const errorText = await res.text();
+                            alert('Error: ' + errorText);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('An error occurred during user update:', error);
+                alert('An unexpected error occurred. See console for details.');
             }
         });
 
