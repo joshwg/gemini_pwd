@@ -2,12 +2,15 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
+	"fmt"
+	"html/template"
 	"log"
 	"net/http"
-	"html/template"
-	"fmt"
 	"strconv"
+	"strings"
+	"time"
 )
 
 // parseTemplate is a helper to simplify template parsing with a base layout.
@@ -51,6 +54,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		createSession(w, user)
+		// When login is successful, we now redirect from the server again.
 		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		return
 	}
@@ -208,7 +212,7 @@ func usersAPIHandler(w http.ResponseWriter, r *http.Request) {
 
 // changeMyPasswordHandler provides an endpoint for a user to update their own password.
 func changeMyPasswordHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+	if r.Method != http.MethodPut {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -347,12 +351,27 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		tags, err := getTags(currentUser.ID)
-		if err != nil {
-			http.Error(w, "Failed to retrieve tags", http.StatusInternalServerError)
-			return
+		tagIDStr := r.URL.Query().Get("id")
+		if tagIDStr != "" {
+			tagID, err := strconv.Atoi(tagIDStr)
+			if err != nil {
+				http.Error(w, "Invalid tag ID", http.StatusBadRequest)
+				return
+			}
+			tag, err := getTagByID(currentUser.ID, tagID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			json.NewEncoder(w).Encode(tag)
+		} else {
+			tags, err := getTags(currentUser.ID)
+			if err != nil {
+				http.Error(w, "Failed to retrieve tags", http.StatusInternalServerError)
+				return
+			}
+			json.NewEncoder(w).Encode(tags)
 		}
-		json.NewEncoder(w).Encode(tags)
 	case http.MethodPost:
 		var data struct {
 			Name        string `json:"name"`
@@ -373,8 +392,18 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusCreated)
 	case http.MethodPut:
+		tagIDStr := r.URL.Query().Get("id")
+		if tagIDStr == "" {
+			http.Error(w, "Tag ID is required for update", http.StatusBadRequest)
+			return
+		}
+		tagID, err := strconv.Atoi(tagIDStr)
+		if err != nil {
+			http.Error(w, "Invalid tag ID", http.StatusBadRequest)
+			return
+		}
+
 		var data struct {
-			ID          int    `json:"id"`
 			Name        string `json:"name"`
 			Description string `json:"description"`
 			Color       string `json:"color"`
@@ -387,7 +416,7 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Tag name is required", http.StatusBadRequest)
 			return
 		}
-		if err := updateTag(currentUser.ID, data.ID, data.Name, data.Description, data.Color); err != nil {
+		if err := updateTag(currentUser.ID, tagID, data.Name, data.Description, data.Color); err != nil {
 			http.Error(w, fmt.Sprintf("Failed to update tag: %v", err), http.StatusInternalServerError)
 			return
 		}
@@ -413,4 +442,160 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func exportTagsHandler(w http.ResponseWriter, r *http.Request) {
+	currentUser, ok := r.Context().Value("user").(*User)
+	if !ok || currentUser == nil {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	tags, err := getTags(currentUser.ID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve tags for export", http.StatusInternalServerError)
+		log.Printf("Error getting tags for user %d for export: %v", currentUser.ID, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment;filename=tags_export.csv")
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	// Write header
+	writer.Write([]string{"Name", "Description", "Color"})
+
+	// Write data
+	for _, tag := range tags {
+		writer.Write([]string{tag.Name, tag.Description, tag.Color})
+	}
+}
+
+func importTagsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	currentUser, ok := r.Context().Value("user").(*User)
+	if !ok || currentUser == nil {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	file, _, err := r.FormFile("csvfile")
+	if err != nil {
+		http.Error(w, "Failed to read uploaded file", http.StatusBadRequest)
+		log.Printf("Error reading form file: %v", err)
+		return
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	records, err := reader.ReadAll()
+	if err != nil {
+		http.Error(w, "Failed to parse CSV file", http.StatusBadRequest)
+		log.Printf("Error parsing CSV: %v", err)
+		return
+	}
+
+	// Skip header row
+	for i, record := range records {
+		if i == 0 {
+			continue
+		}
+		if len(record) < 3 {
+			log.Printf("Skipping malformed record on line %d", i+1)
+			continue
+		}
+		// record[0] = Name, record[1] = Description, record[2] = Color
+		err := createTag(currentUser.ID, record[0], record[1], record[2])
+		if err != nil {
+			// Log error but continue processing other tags
+			log.Printf("Failed to import tag '%s' on line %d: %v", record[0], i+1, err)
+		}
+	}
+
+	http.Redirect(w, r, "/tags", http.StatusSeeOther)
+}
+
+func exportPasswordsHandler(w http.ResponseWriter, r *http.Request) {
+	currentUser, ok := r.Context().Value("user").(*User)
+	if !ok || currentUser == nil {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	passwords, err := getAllDecryptedPasswords(currentUser.ID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve passwords for export", http.StatusInternalServerError)
+		log.Printf("Error getting passwords for user %d for export: %v", currentUser.ID, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment;filename=passwords_export.csv")
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	writer.Write([]string{"Site", "Username", "Password", "Notes", "Tags"})
+
+	for _, p := range passwords {
+		tagsStr := strings.Join(p.Tags, ";") // Use semicolon in case a tag name has a comma
+		writer.Write([]string{p.Site, p.Username, p.Password, p.Notes, tagsStr})
+	}
+}
+
+func importPasswordsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	currentUser, ok := r.Context().Value("user").(*User)
+	if !ok || currentUser == nil {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	file, _, err := r.FormFile("csvfile")
+	if err != nil {
+		http.Error(w, "Failed to read uploaded file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	records, err := reader.ReadAll()
+	if err != nil {
+		http.Error(w, "Failed to parse CSV file", http.StatusBadRequest)
+		return
+	}
+
+	for i, record := range records {
+		if i == 0 { // Skip header
+			continue
+		}
+		if len(record) < 5 {
+			log.Printf("Skipping malformed password record on line %d", i+1)
+			continue
+		}
+		site, username, password, notes, tagsStr := record[0], record[1], record[2], record[3], record[4]
+		tags := strings.Split(tagsStr, ";")
+		
+		// Trim whitespace from tags
+		for i, t := range tags {
+			tags[i] = strings.TrimSpace(t)
+		}
+
+		err := createPasswordEntry(currentUser.ID, site, username, password, notes, tags)
+		if err != nil {
+			log.Printf("Failed to import password for site '%s' on line %d: %v", site, i+1, err)
+		}
+	}
+
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }

@@ -25,9 +25,15 @@ func main() {
 	mux.HandleFunc("/users", authMiddleware(usersHandler))
 	mux.HandleFunc("/tags", authMiddleware(tagsHandler))
 	mux.HandleFunc("/api/users", authMiddleware(usersAPIHandler))
-	mux.HandleFunc("/api/change-password", authMiddleware(changeMyPasswordHandler))
+	mux.HandleFunc("/api/user/password", authMiddleware(changeMyPasswordHandler))
 	mux.HandleFunc("/api/passwords", authMiddleware(passwordsAPIHandler))
 	mux.HandleFunc("/api/tags", authMiddleware(tagsAPIHandler))
+
+	// Import/Export routes
+	mux.HandleFunc("/export/tags", authMiddleware(exportTagsHandler))
+	mux.HandleFunc("/import/tags", authMiddleware(importTagsHandler))
+	mux.HandleFunc("/export/passwords", authMiddleware(exportPasswordsHandler))
+	mux.HandleFunc("/import/passwords", authMiddleware(importPasswordsHandler))
 
 	// Start the server
 	log.Println("Starting server on :8080")

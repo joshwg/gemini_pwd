@@ -4,23 +4,244 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{template "title" .}}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" xintegrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2e5wW44vOq+1R7bI9wE4tWc5r+k5V8c9p2z+Fw3tM5L3y2yXq5y5+C/4g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <title>{{template "title" .}} - Password Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
+<body class="bg-gray-100 min-h-screen">
+    <div x-data="{ open: false }" @keydown.escape="open = false" class="bg-gray-800 text-white">
+        <nav class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <a href="/dashboard" class="text-xl font-bold">Password Manager</a>
+            <div class="relative" x-data="{ dropdownOpen: false }">
+                <button @click="dropdownOpen = !dropdownOpen" class="flex items-center space-x-2 focus:outline-none">
+                    <span>Actions</span>
+                    <svg class="h-5 w-5" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <div x-show="dropdownOpen" @click.away="dropdownOpen = false" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 text-gray-800">
+                    <a href="#" id="changeMyPasswordBtn" class="block px-4 py-2 text-sm hover:bg-gray-100">Change Password</a>
+                    {{if .IsAdmin}}
+                    <a href="/users" class="block px-4 py-2 text-sm hover:bg-gray-100">Users</a>
+                    {{end}}
+                    <a href="/tags" class="block px-4 py-2 text-sm hover:bg-gray-100">Tags</a>
+                    <hr>
+                    <a href="#" id="importTagsBtn" class="block px-4 py-2 text-sm hover:bg-gray-100">Import Tags</a>
+                    <a href="#" id="importPasswordsBtn" class="block px-4 py-2 text-sm hover:bg-gray-100">Import Passwords</a>
+                    <hr>
+                    <a href="/export/tags" class="block px-4 py-2 text-sm hover:bg-gray-100">Export Tags</a>
+                    <a href="/export/passwords" class="block px-4 py-2 text-sm hover:bg-gray-100">Export Passwords</a>
+                    <hr>
+                    <a href="/logout" class="block px-4 py-2 text-sm hover:bg-red-100 text-red-700">Logout</a>
+                </div>
+            </div>
+        </nav>
+    </div>
 
     <!-- The content of other templates will be inserted here -->
     <main class="flex-grow p-8">
         {{template "content" .}}
     </main>
+    <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
 
-    <!-- You could add a footer here if you wanted -->
-    <!--
-    <footer class="bg-gray-200 text-center p-4 mt-auto">
-        <p class="text-gray-600">&copy; 2024 My Password Manager</p>
-    </footer>
-    -->
+    <!-- Change My Password Modal -->
+    <div id="changeMyPasswordModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Change Your Password</h3>
+                <div class="mt-2 px-7 py-3">
+                    <form id="changeMyPasswordForm">
+                        <div class="relative mb-4">
+                            <label for="currentPassword" class="block text-gray-700 text-sm font-bold mb-2 text-left">Current Password</label>
+                            <input type="password" id="currentPassword" name="currentPassword" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                            <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="currentPassword">
+                                <i class="fas fa-eye"></i>
+                            </span>
+                        </div>
+                        <div class="relative mb-4">
+                            <label for="newPassword" class="block text-gray-700 text-sm font-bold mb-2 text-left">New Password</label>
+                            <input type="password" id="newPassword" name="newPassword" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                            <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="newPassword">
+                                <i class="fas fa-eye"></i>
+                            </span>
+                        </div>
+                        <div class="relative mb-6">
+                            <label for="confirmNewPassword" class="block text-gray-700 text-sm font-bold mb-2 text-left">Confirm New Password</label>
+                            <input type="password" id="confirmNewPassword" name="confirmNewPassword" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                            <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="confirmNewPassword">
+                                <i class="fas fa-eye"></i>
+                            </span>
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Change Password</button>
+                            <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <!-- Import Modal -->
+    <div id="importModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 id="importModalTitle" class="text-lg leading-6 font-medium text-gray-900">Import</h3>
+                <div class="mt-2 px-7 py-3">
+                    <form id="importForm" enctype="multipart/form-data" method="POST">
+                        <div class="mb-4">
+                            <label for="importFile" class="block text-gray-700 text-sm font-bold mb-2 text-left">CSV File</label>
+                            <input type="file" id="importFile" name="importFile" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required accept=".csv">
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Import</button>
+                            <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const changeMyPasswordBtn = document.getElementById('changeMyPasswordBtn');
+            const changeMyPasswordModal = document.getElementById('changeMyPasswordModal');
+            const changeMyPasswordForm = document.getElementById('changeMyPasswordForm');
+
+            if (changeMyPasswordBtn) {
+                changeMyPasswordBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (changeMyPasswordModal) {
+                        changeMyPasswordModal.classList.remove('hidden');
+                    }
+                });
+            }
+
+            if (changeMyPasswordForm) {
+                changeMyPasswordForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const newPassword = document.getElementById('newPassword').value;
+                    const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+
+                    if (newPassword !== confirmNewPassword) {
+                        alert('New passwords do not match.');
+                        return;
+                    }
+
+                    const formData = new FormData(changeMyPasswordForm);
+                    const data = {
+                        currentPassword: formData.get('currentPassword'),
+                        newPassword: newPassword,
+                    };
+
+                    try {
+                        const response = await fetch('/api/change-password', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data),
+                        });
+
+                        if (response.ok) {
+                            alert('Password changed successfully!');
+                            changeMyPasswordModal.classList.add('hidden');
+                            changeMyPasswordForm.reset();
+                        } else {
+                            const errorText = await response.text();
+                            alert(`Error: ${errorText}`);
+                        }
+                    } catch (error) {
+                        console.error('Failed to change password:', error);
+                        alert('An error occurred while changing the password.');
+                    }
+                });
+            }
+
+            // Import functionality
+            const importModal = document.getElementById('importModal');
+            const importModalTitle = document.getElementById('importModalTitle');
+            const importForm = document.getElementById('importForm');
+            const importTagsBtn = document.getElementById('importTagsBtn');
+            const importPasswordsBtn = document.getElementById('importPasswordsBtn');
+
+            if (importTagsBtn) {
+                importTagsBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    importModalTitle.textContent = 'Import Tags';
+                    importForm.action = '/import/tags';
+                    importModal.classList.remove('hidden');
+                });
+            }
+
+            if (importPasswordsBtn) {
+                importPasswordsBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    importModalTitle.textContent = 'Import Passwords';
+                    importForm.action = '/import/passwords';
+                    importModal.classList.remove('hidden');
+                });
+            }
+
+            if (importForm) {
+                importForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(importForm);
+                    const action = importForm.action;
+
+                    try {
+                        const response = await fetch(action, {
+                            method: 'POST',
+                            body: formData,
+                        });
+
+                        if (response.ok) {
+                            const resultText = await response.text();
+                            alert(resultText);
+                            importModal.classList.add('hidden');
+                            importForm.reset();
+                            // Refresh the page if on a relevant page
+                            if (action.includes('tags') && window.location.pathname.includes('/tags')) {
+                                window.location.reload();
+                            } else if (action.includes('passwords') && (window.location.pathname.includes('/dashboard') || window.location.pathname === '/')) {
+                                window.location.reload();
+                            }
+                        } else {
+                            const errorText = await response.text();
+                            alert(`Error: ${errorText}`);
+                        }
+                    } catch (error) {
+                        console.error('Failed to import:', error);
+                        alert('An error occurred during the import process.');
+                    }
+                });
+            }
+
+
+            // Generic close modal functionality
+            document.querySelectorAll('.close-modal').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.target.closest('.fixed').classList.add('hidden');
+                });
+            });
+
+            // Generic password visibility toggle
+            document.querySelectorAll('.toggle-password-visibility').forEach(toggle => {
+                toggle.addEventListener('click', (e) => {
+                    const targetId = e.currentTarget.dataset.target;
+                    const passwordInput = document.getElementById(targetId);
+                    if (passwordInput) {
+                        const icon = e.currentTarget.querySelector('i');
+                        if (passwordInput.type === 'password') {
+                            passwordInput.type = 'text';
+                            icon.classList.remove('fa-eye');
+                            icon.classList.add('fa-eye-slash');
+                        } else {
+                            passwordInput.type = 'password';
+                            icon.classList.remove('fa-eye-slash');
+                            icon.classList.add('fa-eye');
+                        }
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>

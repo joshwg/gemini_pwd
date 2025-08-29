@@ -110,6 +110,13 @@
             closeErrorModal.addEventListener('click', () => {
                 errorModal.classList.add('hidden');
             });
+
+            // Check for session timeout message
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('reason') === 'idle') {
+                errorMessage.textContent = 'You have been logged out due to inactivity.';
+                errorModal.classList.remove('hidden');
+            }
         });
     </script>
 </body>

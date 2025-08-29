@@ -206,7 +206,25 @@ func getTags(userID int) ([]Tag, error) {
 		}
 		tags = append(tags, tag)
 	}
+
+	if tags == nil {
+		return []Tag{}, nil
+	}
+
 	return tags, nil
+}
+
+// getTagByID retrieves a single tag for a user.
+func getTagByID(userID int, tagID int) (*Tag, error) {
+	var tag Tag
+	err := db.QueryRow("SELECT id, name, description, color FROM tags WHERE id = ? AND user_id = ?", tagID, userID).Scan(&tag.ID, &tag.Name, &tag.Description, &tag.Color)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("tag not found or permission denied")
+		}
+		return nil, fmt.Errorf("failed to query tag: %w", err)
+	}
+	return &tag, nil
 }
 
 // createTag creates a new tag for a user.
@@ -301,9 +319,6 @@ func getPasswords(userID int, query string) ([]PasswordEntry, error) {
 	}
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return []PasswordEntry{}, nil // Return empty slice if no rows found
-		}
 		return nil, fmt.Errorf("failed to query passwords: %w", err)
 	}
 	defer rows.Close()
@@ -326,6 +341,10 @@ func getPasswords(userID int, query string) ([]PasswordEntry, error) {
 		passwords = append(passwords, p)
 	}
 	
+	if passwords == nil {
+		return []PasswordEntry{}, nil
+	}
+	
 	return passwords, nil
 }
 
@@ -338,7 +357,7 @@ func createPasswordEntry(userID int, site, username, password, notes string, tag
 	}
 
 	encryptedNotes, err := encrypt([]byte(notes))
-	if err != nil {
+		if err != nil {
 		return fmt.Errorf("failed to encrypt notes: %w", err)
 	}
 	
@@ -457,6 +476,64 @@ func deletePasswordEntry(userID, id int) error {
 		return fmt.Errorf("password entry not found or you don't have permission to delete it")
 	}
 	return nil
+}
+
+// getAllDecryptedPasswords retrieves all password entries for a user and decrypts them for export.
+func getAllDecryptedPasswords(userID int) ([]PasswordEntry, error) {
+	sqlQuery := `
+		SELECT
+			pe.id, pe.site, pe.username, pe.password_encrypted, pe.notes_encrypted, pe.created_at, 
+			(SELECT GROUP_CONCAT(t.name) FROM tags t JOIN entry_tags et ON t.id = et.tag_id WHERE et.entry_id = pe.id) as tagNames
+		FROM
+			password_entries pe
+		WHERE
+			pe.user_id = ?
+		ORDER BY
+			pe.site ASC
+	`
+	rows, err := db.Query(sqlQuery, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query passwords for export: %w", err)
+	}
+	defer rows.Close()
+
+	var passwords []PasswordEntry
+	for rows.Next() {
+		var p PasswordEntry
+		var tagNames sql.NullString
+		var encryptedPassword, encryptedNotes []byte
+		if err := rows.Scan(&p.ID, &p.Site, &p.Username, &encryptedPassword, &encryptedNotes, &p.CreatedAt, &tagNames); err != nil {
+			return nil, fmt.Errorf("failed to scan password row for export: %w", err)
+		}
+
+		decryptedPassword, err := decrypt(encryptedPassword)
+		if err != nil {
+			p.Password = "[DECRYPTION FAILED]"
+		} else {
+			p.Password = string(decryptedPassword)
+		}
+
+		decryptedNotes, err := decrypt(encryptedNotes)
+		if err != nil {
+			p.Notes = "[DECRYPTION FAILED]"
+		} else {
+			p.Notes = string(decryptedNotes)
+		}
+
+		if tagNames.Valid {
+			p.Tags = strings.Split(tagNames.String, ",")
+		} else {
+			p.Tags = []string{}
+		}
+
+		passwords = append(passwords, p)
+	}
+
+	if passwords == nil {
+		return []PasswordEntry{}, nil
+	}
+
+	return passwords, nil
 }
 
 // getPasswordByID retrieves a password by its ID and decrypts it.

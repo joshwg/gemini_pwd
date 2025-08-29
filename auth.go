@@ -23,7 +23,7 @@ func (s session) isExpired() bool {
 // createSession creates a new session for a user.
 func createSession(w http.ResponseWriter, user *User) {
 	sessionToken := uuid.NewString()
-	expiresAt := time.Now().Add(120 * time.Minute)
+	expiresAt := time.Now().Add(30 * time.Minute)
 
 	sessions[sessionToken] = session{
 		userID:  user.ID,
@@ -69,9 +69,24 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		userSession, exists := sessions[sessionToken]
 		if !exists || userSession.isExpired() {
 			clearSession(w, r)
-			http.Redirect(w, r, "/", http.StatusFound)
+			redirectURL := "/"
+			if exists && userSession.isExpired() {
+				redirectURL = "/?reason=idle"
+			}
+			http.Redirect(w, r, redirectURL, http.StatusFound)
 			return
 		}
+
+		// Refresh the session timer (sliding expiration)
+		userSession.expires = time.Now().Add(30 * time.Minute)
+		sessions[sessionToken] = userSession
+
+		// Also update the cookie expiration
+		http.SetCookie(w, &http.Cookie{
+			Name:    "session_token",
+			Value:   sessionToken,
+			Expires: userSession.expires,
+		})
 
 		user, err := getUserByID(userSession.userID)
 		if err != nil {
