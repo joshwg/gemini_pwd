@@ -54,3 +54,25 @@ CREATE TABLE IF NOT EXISTS password_tags (
     FOREIGN KEY (password_id) REFERENCES passwords(id) ON DELETE CASCADE,
     FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
 );
+
+-- Create the password_entries table
+CREATE TABLE IF NOT EXISTS password_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    site TEXT NOT NULL,
+    username TEXT NOT NULL,
+    password_encrypted BLOB,
+    notes_encrypted BLOB,
+    salt BLOB NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Create the entry_tags table
+CREATE TABLE IF NOT EXISTS entry_tags (
+    password_entry_id INT NOT NULL,
+    tag_id INT NOT NULL,
+    PRIMARY KEY (password_entry_id, tag_id),
+    FOREIGN KEY (password_entry_id) REFERENCES password_entries(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+);

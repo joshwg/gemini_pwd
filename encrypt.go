@@ -5,18 +5,37 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
+	"golang.org/x/crypto/pbkdf2"
 	"io"
+	"os"
 )
 
-// The key used for AES-256 encryption.
-// This is a placeholder. In a real application, this key should be
-// stored securely (e.g., in an environment variable or a secret management service).
-var encryptionKey = []byte("a_32_byte_secret_key_for_aes_256_e")
+var encryptionKey []byte
 
-// encrypt encrypts data using AES-256 GCM.
-func encrypt(data []byte) ([]byte, error) {
-	block, err := aes.NewCipher(encryptionKey)
+func init() {
+	keyStr := os.Getenv("PWD_SECRET_KEY")
+	if keyStr == "" {
+		keyStr = "ThisIsASecretKeyYouShouldReplace"
+	}
+	// AES-256 requires a 32-byte key. We'll panic on startup if the key is not the correct size.
+	if len(keyStr) != 32 {
+		panic(fmt.Sprintf("Invalid PWD_SECRET_KEY length: must be 32 bytes, but got %d", len(keyStr)))
+	}
+	encryptionKey = []byte(keyStr)
+}
+
+// deriveKey uses PBKDF2 to create a unique key for an entry from the master key and a salt.
+func deriveKey(salt []byte) []byte {
+	// The parameters (4096 iterations, 32-byte key length, SHA-256) are standard.
+	return pbkdf2.Key(encryptionKey, salt, 4096, 32, sha256.New)
+}
+
+// encrypt encrypts data using a key derived from the master key and the provided salt.
+func encrypt(data, salt []byte) ([]byte, error) {
+	derivedKey := deriveKey(salt)
+	block, err := aes.NewCipher(derivedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -35,9 +54,10 @@ func encrypt(data []byte) ([]byte, error) {
 	return ciphertext, nil
 }
 
-// decrypt decrypts data that was encrypted with AES-256 GCM.
-func decrypt(data []byte) ([]byte, error) {
-	block, err := aes.NewCipher(encryptionKey)
+// decrypt decrypts data using a key derived from the master key and the provided salt.
+func decrypt(data, salt []byte) ([]byte, error) {
+	derivedKey := deriveKey(salt)
+	block, err := aes.NewCipher(derivedKey)
 	if err != nil {
 		return nil, err
 	}

@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // parseTemplate is a helper to simplify template parsing with a base layout.

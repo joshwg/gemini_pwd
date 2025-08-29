@@ -11,26 +11,29 @@
 <body class="bg-gray-100 min-h-screen">
     <div x-data="{ open: false }" @keydown.escape="open = false" class="bg-gray-800 text-white">
         <nav class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <a href="/dashboard" class="text-xl font-bold">Password Manager</a>
-            <div class="relative" x-data="{ dropdownOpen: false }">
-                <button @click="dropdownOpen = !dropdownOpen" class="flex items-center space-x-2 focus:outline-none">
-                    <span>Actions</span>
-                    <svg class="h-5 w-5" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-                <div x-show="dropdownOpen" @click.away="dropdownOpen = false" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 text-gray-800">
-                    <a href="#" id="changeMyPasswordBtn" class="block px-4 py-2 text-sm hover:bg-gray-100">Change Password</a>
-                    {{if .IsAdmin}}
-                    <a href="/users" class="block px-4 py-2 text-sm hover:bg-gray-100">Users</a>
-                    {{end}}
-                    <a href="/tags" class="block px-4 py-2 text-sm hover:bg-gray-100">Tags</a>
-                    <hr>
-                    <a href="#" id="importTagsBtn" class="block px-4 py-2 text-sm hover:bg-gray-100">Import Tags</a>
-                    <a href="#" id="importPasswordsBtn" class="block px-4 py-2 text-sm hover:bg-gray-100">Import Passwords</a>
-                    <hr>
-                    <a href="/export/tags" class="block px-4 py-2 text-sm hover:bg-gray-100">Export Tags</a>
-                    <a href="/export/passwords" class="block px-4 py-2 text-sm hover:bg-gray-100">Export Passwords</a>
-                    <hr>
-                    <a href="/logout" class="block px-4 py-2 text-sm hover:bg-red-100 text-red-700">Logout</a>
+            <span class="text-xl font-bold">Password Manager</span>
+            <div class="flex items-center">
+                <a href="/dashboard" class="text-white hover:text-gray-300 mr-4">Dashboard</a>
+                <div class="relative" x-data="{ dropdownOpen: false }">
+                    <button @click="dropdownOpen = !dropdownOpen" class="flex items-center space-x-2 focus:outline-none">
+                        <span>Actions</span>
+                        <svg class="h-5 w-5" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div x-show="dropdownOpen" @click.away="dropdownOpen = false" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 text-gray-800">
+                        {{if .IsAdmin}}
+                        <a href="/users" class="block px-4 py-2 text-sm hover:bg-gray-100">Users</a>
+                        {{end}}
+                        <a href="/tags" class="block px-4 py-2 text-sm hover:bg-gray-100">Tags</a>
+                        <hr>
+                        <a href="#" id="importTagsBtn" class="block px-4 py-2 text-sm hover:bg-gray-100">Import Tags</a>
+                        <a href="#" id="importPasswordsBtn" class="block px-4 py-2 text-sm hover:bg-gray-100">Import Passwords</a>
+                        <hr>
+                        <a href="/export/tags" class="block px-4 py-2 text-sm hover:bg-gray-100">Export Tags</a>
+                        <a href="/export/passwords" class="block px-4 py-2 text-sm hover:bg-gray-100">Export Passwords</a>
+                        <a href="#" id="changeMyPasswordBtn" class="block px-4 py-2 text-sm hover:bg-gray-100">Change Password</a>
+                        <hr>
+                        <a href="/logout" class="block px-4 py-2 text-sm hover:bg-red-100 text-red-700">Logout</a>
+                    </div>
                 </div>
             </div>
         </nav>

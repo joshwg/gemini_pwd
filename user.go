@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
+	"math/rand"
 	"strings"
+	"time"
 )
 
 // The User, PasswordEntry, and Tag structs are assumed to be in models.go
@@ -350,24 +352,30 @@ func getPasswords(userID int, query string) ([]PasswordEntry, error) {
 
 // createPasswordEntry creates a new password entry.
 func createPasswordEntry(userID int, site, username, password, notes string, tagNames []string) error {
-	// First, encrypt the sensitive data
-	encryptedPassword, err := encrypt([]byte(password))
+	// Generate a unique salt for this entry
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		return fmt.Errorf("failed to generate salt: %w", err)
+	}
+
+	// First, encrypt the sensitive data using the new salt
+	encryptedPassword, err := encrypt([]byte(password), salt)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt password: %w", err)
 	}
 
-	encryptedNotes, err := encrypt([]byte(notes))
-		if err != nil {
+	encryptedNotes, err := encrypt([]byte(notes), salt)
+	if err != nil {
 		return fmt.Errorf("failed to encrypt notes: %w", err)
 	}
-	
+
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
-	
-	res, err := tx.Exec("INSERT INTO password_entries (user_id, site, username, password_encrypted, notes_encrypted, created_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)", userID, site, username, encryptedPassword, encryptedNotes)
+
+	res, err := tx.Exec("INSERT INTO password_entries (user_id, site, username, password_encrypted, notes_encrypted, salt, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)", userID, site, username, encryptedPassword, encryptedNotes, salt)
 	if err != nil {
 		return fmt.Errorf("failed to insert password entry: %w", err)
 	}
@@ -415,12 +423,19 @@ func updatePasswordEntry(userID, id int, site, username, password, notes string,
 	}
 	defer tx.Rollback()
 
+	// Get the salt for the existing entry
+	var salt []byte
+	err = tx.QueryRow("SELECT salt FROM password_entries WHERE id = ? AND user_id = ?", id, userID).Scan(&salt)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve salt for password entry: %w", err)
+	}
+
 	// Update the password entry
-	encryptedPassword, err := encrypt([]byte(password))
+	encryptedPassword, err := encrypt([]byte(password), salt)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt password: %w", err)
 	}
-	encryptedNotes, err := encrypt([]byte(notes))
+	encryptedNotes, err := encrypt([]byte(notes), salt)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt notes: %w", err)
 	}
@@ -482,7 +497,7 @@ func deletePasswordEntry(userID, id int) error {
 func getAllDecryptedPasswords(userID int) ([]PasswordEntry, error) {
 	sqlQuery := `
 		SELECT
-			pe.id, pe.site, pe.username, pe.password_encrypted, pe.notes_encrypted, pe.created_at, 
+			pe.id, pe.site, pe.username, pe.password_encrypted, pe.notes_encrypted, pe.salt, pe.created_at, 
 			(SELECT GROUP_CONCAT(t.name) FROM tags t JOIN entry_tags et ON t.id = et.tag_id WHERE et.entry_id = pe.id) as tagNames
 		FROM
 			password_entries pe
@@ -501,20 +516,23 @@ func getAllDecryptedPasswords(userID int) ([]PasswordEntry, error) {
 	for rows.Next() {
 		var p PasswordEntry
 		var tagNames sql.NullString
-		var encryptedPassword, encryptedNotes []byte
-		if err := rows.Scan(&p.ID, &p.Site, &p.Username, &encryptedPassword, &encryptedNotes, &p.CreatedAt, &tagNames); err != nil {
+		var encryptedPassword, encryptedNotes, salt []byte
+		if err := rows.Scan(&p.ID, &p.Site, &p.Username, &encryptedPassword, &encryptedNotes, &salt, &p.CreatedAt, &tagNames); err != nil {
 			return nil, fmt.Errorf("failed to scan password row for export: %w", err)
 		}
 
-		decryptedPassword, err := decrypt(encryptedPassword)
+		decryptedPassword, err := decrypt(encryptedPassword, salt)
 		if err != nil {
+			// Log error but don't fail the whole export
+			fmt.Printf("could not decrypt password for entry %d: %v\n", p.ID, err)
 			p.Password = "[DECRYPTION FAILED]"
 		} else {
 			p.Password = string(decryptedPassword)
 		}
 
-		decryptedNotes, err := decrypt(encryptedNotes)
+		decryptedNotes, err := decrypt(encryptedNotes, salt)
 		if err != nil {
+			fmt.Printf("could not decrypt notes for entry %d: %v\n", p.ID, err)
 			p.Notes = "[DECRYPTION FAILED]"
 		} else {
 			p.Notes = string(decryptedNotes)
@@ -539,12 +557,12 @@ func getAllDecryptedPasswords(userID int) ([]PasswordEntry, error) {
 // getPasswordByID retrieves a password by its ID and decrypts it.
 func getPasswordByID(userID, id int) (*PasswordEntry, error) {
 	var p PasswordEntry
-	var encryptedPassword, encryptedNotes []byte
+	var encryptedPassword, encryptedNotes, salt []byte
 	var tagNames, tagColors sql.NullString
 
 	sqlQuery := `
 		SELECT
-			pe.id, pe.site, pe.username, pe.password_encrypted, pe.notes_encrypted, pe.created_at, GROUP_CONCAT(t.name) as tagNames, GROUP_CONCAT(t.color) as tagColors
+			pe.id, pe.site, pe.username, pe.password_encrypted, pe.notes_encrypted, pe.salt, pe.created_at, GROUP_CONCAT(t.name) as tagNames, GROUP_CONCAT(t.color) as tagColors
 		FROM
 			password_entries pe
 		LEFT JOIN
@@ -556,7 +574,7 @@ func getPasswordByID(userID, id int) (*PasswordEntry, error) {
 		GROUP BY
 			pe.id
 	`
-	err := db.QueryRow(sqlQuery, userID, id).Scan(&p.ID, &p.Site, &p.Username, &encryptedPassword, &encryptedNotes, &p.CreatedAt, &tagNames, &tagColors)
+	err := db.QueryRow(sqlQuery, userID, id).Scan(&p.ID, &p.Site, &p.Username, &encryptedPassword, &encryptedNotes, &salt, &p.CreatedAt, &tagNames, &tagColors)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve password: %w", err)
 	}
@@ -568,17 +586,21 @@ func getPasswordByID(userID, id int) (*PasswordEntry, error) {
 	}
 
 	// Decrypt the password and notes
-	decryptedPassword, err := decrypt(encryptedPassword)
+	decryptedPassword, err := decrypt(encryptedPassword, salt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt password: %w", err)
 	}
 	p.Password = string(decryptedPassword)
 
-	decryptedNotes, err := decrypt(encryptedNotes)
+	decryptedNotes, err := decrypt(encryptedNotes, salt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt notes: %w", err)
 	}
 	p.Notes = string(decryptedNotes)
 
 	return &p, nil
+}
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
 }

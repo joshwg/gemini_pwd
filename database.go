@@ -45,6 +45,7 @@ func initDB(filepath string) {
 		username TEXT NOT NULL,
 		password_encrypted BLOB,
 		notes_encrypted BLOB,
+		salt BLOB NOT NULL,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
