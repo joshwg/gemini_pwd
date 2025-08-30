@@ -56,6 +56,23 @@ func initDB(filepath string) {
 		FOREIGN KEY(entry_id) REFERENCES password_entries(id) ON DELETE CASCADE,
 		FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
 	);
+	CREATE TABLE IF NOT EXISTS sessions (
+		id TEXT PRIMARY KEY,
+		user_id INTEGER NOT NULL,
+		expires_at TIMESTAMP NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+	CREATE TABLE IF NOT EXISTS login_attempts (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		username TEXT NOT NULL,
+		ip_address TEXT NOT NULL,
+		successful BOOLEAN NOT NULL DEFAULT 0,
+		attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+	CREATE INDEX IF NOT EXISTS idx_login_attempts_username ON login_attempts(username);
+	CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address);
 	`
 	_, err = db.Exec(createTables)
 	if err != nil {

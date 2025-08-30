@@ -30,7 +30,7 @@ func parseTemplate(w http.ResponseWriter, name string, data interface{}) {
 
 // renderStandaloneTemplate is a helper for simple, non-base-templated pages.
 func renderStandaloneTemplate(w http.ResponseWriter, name string) {
-	tmpl, err := template.ParseFiles("templates/"+name)
+	tmpl, err := template.ParseFiles("templates/" + name)
 	if err != nil {
 		http.Error(w, "Could not load template", http.StatusInternalServerError)
 		log.Printf("Error parsing simple template '%s': %v", name, err)
@@ -41,18 +41,65 @@ func renderStandaloneTemplate(w http.ResponseWriter, name string) {
 
 // loginHandler serves the login page and handles login requests.
 func loginHandler(w http.ResponseWriter, r *http.Request) {
+	// Apply security headers to login page too
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-XSS-Protection", "1; mode=block")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; script-src 'self' https://cdn.jsdelivr.net; font-src 'self' https://cdnjs.cloudflare.com")
+
 	if r.Method == http.MethodPost {
 		username := r.FormValue("username")
 		password := r.FormValue("password")
+		clientIP := getClientIP(r)
 
-		user, err := authenticateUser(username, password)
+		// Check rate limiting before attempting authentication
+		isLimited, cooldownTime, err := checkRateLimit(username, clientIP)
 		if err != nil {
-			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
-			log.Printf("Failed login attempt for user: %s", username)
+			log.Printf("Error checking rate limit: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
-		createSession(w, user)
+		if isLimited {
+			// Record this failed attempt
+			recordLoginAttempt(username, clientIP, false)
+
+			minutes := int(cooldownTime.Minutes())
+			seconds := int(cooldownTime.Seconds()) % 60
+			var message string
+			if minutes > 0 {
+				message = fmt.Sprintf("Too many failed login attempts. Please wait %d minutes and %d seconds before trying again.", minutes, seconds)
+			} else {
+				message = fmt.Sprintf("Too many failed login attempts. Please wait %d seconds before trying again.", seconds)
+			}
+
+			http.Error(w, message, http.StatusTooManyRequests)
+			log.Printf("Rate limited login attempt for user: %s from IP: %s", username, clientIP)
+			return
+		}
+
+		user, err := authenticateUser(username, password)
+		if err != nil {
+			// Record failed attempt
+			recordLoginAttempt(username, clientIP, false)
+
+			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			log.Printf("Failed login attempt for user: %s from IP: %s", username, clientIP)
+			return
+		}
+
+		// Record successful attempt
+		recordLoginAttempt(username, clientIP, true)
+
+		// Create session
+		err = createSession(w, user)
+		if err != nil {
+			log.Printf("Error creating session for user %s: %v", username, err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
 		// When login is successful, we now redirect from the server again.
 		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		return
@@ -63,7 +110,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 // dashboardHandler serves the main user dashboard.
 func dashboardHandler(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*User)
+	user, ok := getUserFromContext(r)
 	if !ok || user == nil {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -74,7 +121,7 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 
 // usersHandler serves the user management page (formerly admin).
 func usersHandler(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*User)
+	user, ok := getUserFromContext(r)
 	if !ok || user == nil || !user.IsAdmin {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		log.Printf("Access denied for non-admin user: %+v", user)
@@ -86,7 +133,7 @@ func usersHandler(w http.ResponseWriter, r *http.Request) {
 
 // tagsHandler serves the tag management page.
 func tagsHandler(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*User)
+	user, ok := getUserFromContext(r)
 	if !ok || user == nil {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -103,7 +150,7 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 
 // usersAPIHandler provides a RESTful interface for user management (for admins).
 func usersAPIHandler(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := r.Context().Value("user").(*User)
+	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil || !currentUser.IsAdmin {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		log.Printf("API access denied for non-admin user: %+v", currentUser)
@@ -170,7 +217,7 @@ func usersAPIHandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Failed to decode JSON for user update: %v", err)
 			return
 		}
-		
+
 		var targetUserID int
 		err := db.QueryRow("SELECT id FROM users WHERE username = ? COLLATE NOCASE", data.Username).Scan(&targetUserID)
 		if err != nil {
@@ -200,6 +247,11 @@ func usersAPIHandler(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Error changing password: %v", err)
 				return
 			}
+
+			// Invalidate all sessions for the target user after admin password change
+			if err := clearAllUserSessions(targetUserID); err != nil {
+				log.Printf("Error clearing sessions after admin password change for user '%s': %v", data.Username, err)
+			}
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -216,7 +268,7 @@ func changeMyPasswordHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser, ok := r.Context().Value("user").(*User)
+	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
 		return
@@ -242,6 +294,14 @@ func changeMyPasswordHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Invalidate all sessions for this user after password change
+	if err := clearAllUserSessions(currentUser.ID); err != nil {
+		log.Printf("Error clearing sessions after password change for user '%s': %v", currentUser.Username, err)
+	}
+
+	// Clear current session cookie
+	clearSession(w, r)
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -252,7 +312,7 @@ func testHandler(w http.ResponseWriter, r *http.Request) {
 
 // passwordsAPIHandler provides a RESTful interface for password management.
 func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := r.Context().Value("user").(*User)
+	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
@@ -298,7 +358,7 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Password ID is required", http.StatusBadRequest)
 			return
 		}
-		
+
 		id, err := strconv.Atoi(passwordID)
 		if err != nil {
 			http.Error(w, "Invalid password ID", http.StatusBadRequest)
@@ -340,7 +400,7 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 
 // tagsAPIHandler provides a RESTful interface for tag management.
 func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := r.Context().Value("user").(*User)
+	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
@@ -432,7 +492,7 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid tag ID", http.StatusBadRequest)
 			return
 		}
-		
+
 		if err := deleteTag(currentUser.ID, id); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -444,7 +504,7 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func exportTagsHandler(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := r.Context().Value("user").(*User)
+	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
@@ -478,7 +538,7 @@ func importTagsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser, ok := r.Context().Value("user").(*User)
+	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
@@ -521,7 +581,7 @@ func importTagsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func exportPasswordsHandler(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := r.Context().Value("user").(*User)
+	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
@@ -554,7 +614,7 @@ func importPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser, ok := r.Context().Value("user").(*User)
+	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
@@ -584,7 +644,7 @@ func importPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		site, username, password, notes, tagsStr := record[0], record[1], record[2], record[3], record[4]
 		tags := strings.Split(tagsStr, ";")
-		
+
 		// Trim whitespace from tags
 		for i, t := range tags {
 			tags[i] = strings.TrimSpace(t)

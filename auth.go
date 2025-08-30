@@ -3,59 +3,272 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
+	"log"
+	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-var sessions = map[string]session{}
+// Rate limiting constants
+const (
+	maxLoginAttempts     = 3
+	cooldownDuration     = 30 * time.Second
+	maxLoginAttemptsHard = 6
+	hardCooldownDuration = 5 * time.Minute
+)
 
-type session struct {
-	userID  int
-	expires time.Time
+// Define a custom type for context keys to avoid collisions
+type contextKey string
+
+const userContextKey contextKey = "user"
+
+// getUserFromContext is a helper function to extract the user from the request context
+func getUserFromContext(r *http.Request) (*User, bool) {
+	user, ok := r.Context().Value(userContextKey).(*User)
+	return user, ok
 }
 
-func (s session) isExpired() bool {
-	return s.expires.Before(time.Now())
+// getClientIP extracts the client IP address from the request
+func getClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header first (for proxies)
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded != "" {
+		// Take the first IP in the chain
+		ips := strings.Split(forwarded, ",")
+		if len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
+	}
+
+	// Check X-Real-IP header
+	realIP := r.Header.Get("X-Real-IP")
+	if realIP != "" {
+		return realIP
+	}
+
+	// Fall back to RemoteAddr
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return ip
 }
 
-// createSession creates a new session for a user.
-func createSession(w http.ResponseWriter, user *User) {
+// recordLoginAttempt records a login attempt in the database
+func recordLoginAttempt(username, ipAddress string, successful bool) error {
+	_, err := db.Exec(
+		"INSERT INTO login_attempts (username, ip_address, successful, attempted_at) VALUES (?, ?, ?, ?)",
+		username, ipAddress, successful, time.Now(),
+	)
+	return err
+}
+
+// checkRateLimit checks if a user or IP is rate limited
+func checkRateLimit(username, ipAddress string) (bool, time.Duration, error) {
+	now := time.Now()
+
+	// Check failed attempts for this username in the last 5 minutes
+	var failedAttempts int
+	err := db.QueryRow(`
+		SELECT COUNT(*) FROM login_attempts 
+		WHERE username = ? COLLATE NOCASE 
+		AND successful = 0 
+		AND attempted_at > ?
+	`, username, now.Add(-hardCooldownDuration)).Scan(&failedAttempts)
+
+	if err != nil {
+		return false, 0, err
+	}
+
+	// If 6+ failed attempts, require 5 minute cooldown
+	if failedAttempts >= maxLoginAttemptsHard {
+		var lastAttempt time.Time
+		err = db.QueryRow(`
+			SELECT attempted_at FROM login_attempts 
+			WHERE username = ? COLLATE NOCASE 
+			AND successful = 0 
+			ORDER BY attempted_at DESC LIMIT 1
+		`, username).Scan(&lastAttempt)
+
+		if err != nil {
+			return false, 0, err
+		}
+
+		timeLeft := hardCooldownDuration - now.Sub(lastAttempt)
+		if timeLeft > 0 {
+			return true, timeLeft, nil
+		}
+	}
+
+	// Check failed attempts for this username in the last 30 seconds
+	err = db.QueryRow(`
+		SELECT COUNT(*) FROM login_attempts 
+		WHERE username = ? COLLATE NOCASE 
+		AND successful = 0 
+		AND attempted_at > ?
+	`, username, now.Add(-cooldownDuration)).Scan(&failedAttempts)
+
+	if err != nil {
+		return false, 0, err
+	}
+
+	// If 3+ failed attempts, require 30 second cooldown
+	if failedAttempts >= maxLoginAttempts {
+		var lastAttempt time.Time
+		err = db.QueryRow(`
+			SELECT attempted_at FROM login_attempts 
+			WHERE username = ? COLLATE NOCASE 
+			AND successful = 0 
+			ORDER BY attempted_at DESC LIMIT 1
+		`, username).Scan(&lastAttempt)
+
+		if err != nil {
+			return false, 0, err
+		}
+
+		timeLeft := cooldownDuration - now.Sub(lastAttempt)
+		if timeLeft > 0 {
+			return true, timeLeft, nil
+		}
+	}
+
+	return false, 0, nil
+}
+
+// createSession creates a new session for a user in the database
+func createSession(w http.ResponseWriter, user *User) error {
 	sessionToken := uuid.NewString()
 	expiresAt := time.Now().Add(30 * time.Minute)
 
-	sessions[sessionToken] = session{
-		userID:  user.ID,
-		expires: expiresAt,
+	// Insert session into database
+	_, err := db.Exec(
+		"INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)",
+		sessionToken, user.ID, expiresAt,
+	)
+	if err != nil {
+		return err
 	}
 
+	// Set secure cookie
 	http.SetCookie(w, &http.Cookie{
-		Name:    "session_token",
-		Value:   sessionToken,
-		Expires: expiresAt,
+		Name:     "session_token",
+		Value:    sessionToken,
+		Expires:  expiresAt,
+		HttpOnly: true,  // Prevent XSS
+		Secure:   false, // Set to true in production with HTTPS
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
 	})
+
+	return nil
 }
 
-// clearSession removes a user's session.
+// clearSession removes a user's session from database and cookie
 func clearSession(w http.ResponseWriter, r *http.Request) {
 	c, err := r.Cookie("session_token")
 	if err != nil {
 		// If the cookie is not found, there's nothing to clear.
 		return
 	}
-	delete(sessions, c.Value)
+
+	// Delete from database
+	_, err = db.Exec("DELETE FROM sessions WHERE id = ?", c.Value)
+	if err != nil {
+		log.Printf("Error deleting session from database: %v", err)
+	}
+
+	// Clear cookie
 	http.SetCookie(w, &http.Cookie{
-		Name:    "session_token",
-		Value:   "",
-		Expires: time.Unix(0, 0),
-		MaxAge: -1,
+		Name:     "session_token",
+		Value:    "",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   false, // Set to true in production with HTTPS
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
 	})
 }
 
-// authMiddleware protects routes that require authentication.
-func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+// clearAllUserSessions removes all sessions for a specific user (used when password changes)
+func clearAllUserSessions(userID int) error {
+	_, err := db.Exec("DELETE FROM sessions WHERE user_id = ?", userID)
+	return err
+}
+
+// validateSession checks if a session exists and is valid in the database
+func validateSession(sessionToken string) (*User, error) {
+	var userID int
+	var expiresAt time.Time
+
+	err := db.QueryRow(`
+		SELECT user_id, expires_at FROM sessions 
+		WHERE id = ? AND expires_at > ?
+	`, sessionToken, time.Now()).Scan(&userID, &expiresAt)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("session not found or expired")
+		}
+		return nil, err
+	}
+
+	// Refresh session expiration (sliding window)
+	newExpiresAt := time.Now().Add(30 * time.Minute)
+	_, err = db.Exec("UPDATE sessions SET expires_at = ? WHERE id = ?", newExpiresAt, sessionToken)
+	if err != nil {
+		log.Printf("Error updating session expiration: %v", err)
+	}
+
+	// Get user details
+	user, err := getUserByID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+// cleanupExpiredSessions removes expired sessions from the database
+func cleanupExpiredSessions() {
+	_, err := db.Exec("DELETE FROM sessions WHERE expires_at <= ?", time.Now())
+	if err != nil {
+		log.Printf("Error cleaning up expired sessions: %v", err)
+	}
+}
+
+// cleanupOldLoginAttempts removes old login attempts (older than 24 hours)
+func cleanupOldLoginAttempts() {
+	cutoff := time.Now().Add(-24 * time.Hour)
+	_, err := db.Exec("DELETE FROM login_attempts WHERE attempted_at <= ?", cutoff)
+	if err != nil {
+		log.Printf("Error cleaning up old login attempts: %v", err)
+	}
+}
+
+// securityHeaders adds security headers to all responses
+func securityHeaders(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Security headers
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; script-src 'self' https://cdn.jsdelivr.net; font-src 'self' https://cdnjs.cloudflare.com")
+
+		// Call the next handler
+		next.ServeHTTP(w, r)
+	}
+}
+
+// authMiddleware protects routes that require authentication using database sessions
+func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return securityHeaders(func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie("session_token")
 		if err != nil {
 			if err == http.ErrNoCookie {
@@ -65,36 +278,26 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
-		sessionToken := c.Value
-		userSession, exists := sessions[sessionToken]
-		if !exists || userSession.isExpired() {
+
+		user, err := validateSession(c.Value)
+		if err != nil {
 			clearSession(w, r)
-			redirectURL := "/"
-			if exists && userSession.isExpired() {
-				redirectURL = "/?reason=idle"
-			}
-			http.Redirect(w, r, redirectURL, http.StatusFound)
+			http.Redirect(w, r, "/?reason=session_expired", http.StatusFound)
 			return
 		}
 
-		// Refresh the session timer (sliding expiration)
-		userSession.expires = time.Now().Add(30 * time.Minute)
-		sessions[sessionToken] = userSession
-
-		// Also update the cookie expiration
+		// Update cookie expiration to match session
 		http.SetCookie(w, &http.Cookie{
-			Name:    "session_token",
-			Value:   sessionToken,
-			Expires: userSession.expires,
+			Name:     "session_token",
+			Value:    c.Value,
+			Expires:  time.Now().Add(30 * time.Minute),
+			HttpOnly: true,
+			Secure:   false, // Set to true in production with HTTPS
+			SameSite: http.SameSiteLaxMode,
+			Path:     "/",
 		})
 
-		user, err := getUserByID(userSession.userID)
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-
-		ctx := context.WithValue(r.Context(), "user", user)
+		ctx := context.WithValue(r.Context(), userContextKey, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
-	}
+	})
 }
