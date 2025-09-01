@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" xintegrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2e5wW44vOq+1R7bI9wE4tWc5r+k5V8c9p2z+Fw3tM5L3y2yXq5y5+C/4g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 </head>
 <body class="bg-gray-100 flex items-center justify-center h-screen">
@@ -16,26 +16,197 @@
                 <label class="block text-gray-700 text-sm font-bold mb-2" for="username">
                     Username
                 </label>
-                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="username" name="username" type="text" placeholder="Username">
+                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="username" name="username" type="text" placeholder="Username" required>
             </div>
             <div class="mb-6 relative">
                 <label class="block text-gray-700 text-sm font-bold mb-2" for="password">
                     Password
                 </label>
-                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" id="password" name="password" type="password" placeholder="******************">
+                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" id="password" name="password" type="password" placeholder="******************" required>
                 <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="password">
                     <i class="fas fa-eye"></i>
                 </span>
             </div>
             <div class="flex items-center justify-between">
-                <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" type="submit">
+                <button id="signInButton" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400" type="submit" disabled>
                     Sign In
                 </button>
             </div>
+            <!-- Rate Limit Countdown Timer -->
+            <div id="rateLimitMessage" class="mt-4 text-center text-red-600 hidden">
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                    <div class="flex items-center justify-center">
+                        <i class="fas fa-clock mr-2"></i>
+                        <span id="rateLimitText">Too many failed attempts</span>
+                    </div>
+                    <div class="mt-2">
+                        <span class="text-lg font-bold" id="countdownTimer">0:00</span>
+                        <div class="text-sm">Please wait before trying again</div>
+                    </div>
+                </div>
+            </div>
         </form>
     </div>
+
+    <!-- Error Modal -->
+    <div id="errorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Login Failed</h3>
+                <div class="mt-2 px-7 py-3">
+                    <p class="text-sm text-gray-500" id="errorMessage"></p>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="closeErrorModal" class="px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            const signInButton = document.getElementById('signInButton');
+
+            // Function to validate form and update button state
+            function validateForm() {
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value.trim();
+                
+                // Update input field visual states (only show green for valid, default for empty)
+                if (username) {
+                    usernameInput.classList.remove('border-gray-300');
+                    usernameInput.classList.add('border-green-400');
+                } else {
+                    usernameInput.classList.remove('border-green-400');
+                    usernameInput.classList.add('border-gray-300');
+                }
+                
+                if (password) {
+                    passwordInput.classList.remove('border-gray-300');
+                    passwordInput.classList.add('border-green-400');
+                } else {
+                    passwordInput.classList.remove('border-green-400');
+                    passwordInput.classList.add('border-gray-300');
+                }
+                
+                // Update button state
+                if (username && password) {
+                    signInButton.disabled = false;
+                    signInButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                    signInButton.classList.add('bg-blue-500', 'hover:bg-blue-700');
+                } else {
+                    signInButton.disabled = true;
+                    signInButton.classList.remove('bg-blue-500', 'hover:bg-blue-700');
+                    signInButton.classList.add('bg-gray-400', 'cursor-not-allowed');
+                }
+            }
+
+            // Add event listeners to both input fields
+            usernameInput.addEventListener('input', validateForm);
+            passwordInput.addEventListener('input', validateForm);
+
+            // Initial validation on page load
+            validateForm();
+
+            // Rate limiting functionality
+            let countdownInterval = null;
+            const rateLimitMessage = document.getElementById('rateLimitMessage');
+            const countdownTimer = document.getElementById('countdownTimer');
+            const rateLimitText = document.getElementById('rateLimitText');
+
+            function formatTime(seconds) {
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+            }
+
+            function showRateLimitMessage(remainingTime) {
+                rateLimitMessage.classList.remove('hidden');
+                signInButton.disabled = true;
+                signInButton.classList.remove('bg-blue-500', 'hover:bg-blue-700');
+                signInButton.classList.add('bg-red-400', 'cursor-not-allowed');
+                
+                if (remainingTime > 60) {
+                    rateLimitText.textContent = 'Too many failed attempts. Please wait:';
+                } else {
+                    rateLimitText.textContent = 'Rate limited. Please wait:';
+                }
+
+                let timeLeft = remainingTime;
+                countdownTimer.textContent = formatTime(timeLeft);
+
+                countdownInterval = setInterval(() => {
+                    timeLeft--;
+                    countdownTimer.textContent = formatTime(timeLeft);
+                    
+                    if (timeLeft <= 0) {
+                        hideRateLimitMessage();
+                    }
+                }, 1000);
+            }
+
+            function hideRateLimitMessage() {
+                if (countdownInterval) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                }
+                rateLimitMessage.classList.add('hidden');
+                signInButton.classList.remove('bg-red-400');
+                validateForm(); // Re-validate to restore proper button state
+            }
+
+            async function checkRateLimit(username) {
+                if (!username) return;
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('username', username);
+                    
+                    const response = await fetch('/api/rate-limit-check', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.isLimited && data.remainingTime > 0) {
+                            showRateLimitMessage(data.remainingTime);
+                        } else {
+                            hideRateLimitMessage();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error checking rate limit:', error);
+                }
+            }
+
+            // Check rate limit when username changes
+            usernameInput.addEventListener('input', () => {
+                const username = usernameInput.value.trim();
+                if (username) {
+                    checkRateLimit(username);
+                } else {
+                    hideRateLimitMessage();
+                }
+            });
+
+            // Override validateForm to respect rate limiting
+            const originalValidateForm = validateForm;
+            validateForm = function() {
+                originalValidateForm();
+                
+                // If rate limited, keep button disabled regardless of form validity
+                if (!rateLimitMessage.classList.contains('hidden')) {
+                    signInButton.disabled = true;
+                    signInButton.classList.remove('bg-blue-500', 'hover:bg-blue-700');
+                    signInButton.classList.add('bg-red-400', 'cursor-not-allowed');
+                }
+            };
+
             // Toggle password visibility
             document.querySelectorAll('.toggle-password-visibility').forEach(toggle => {
                 toggle.addEventListener('click', (e) => {
@@ -54,6 +225,76 @@
                     }
                 });
             });
+
+            const form = document.querySelector('form');
+            const errorModal = document.getElementById('errorModal');
+            const errorMessage = document.getElementById('errorMessage');
+            const closeErrorModal = document.getElementById('closeErrorModal');
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const formData = new FormData(form);
+                
+                // Basic client-side validation
+                if (!formData.get('username') || !formData.get('password')) {
+                    errorMessage.textContent = 'Please enter both username and password.';
+                    errorModal.classList.remove('hidden');
+                    return;
+                }
+
+                // Check if we're currently rate limited
+                if (!rateLimitMessage.classList.contains('hidden')) {
+                    errorMessage.textContent = 'Please wait for the countdown to finish before trying again.';
+                    errorModal.classList.remove('hidden');
+                    return;
+                }
+
+                const response = await fetch('/', {
+                    method: 'POST',
+                    body: new URLSearchParams(formData) // Send as form-urlencoded
+                });
+
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else if (!response.ok) {
+                    const errorText = await response.text();
+                    
+                    // If it's a rate limiting error (429), extract remaining time and show countdown
+                    if (response.status === 429) {
+                        // Parse the rate limit message to extract time
+                        const match = errorText.match(/wait (?:(\d+) minutes?(?: and)?)?(?:\s*(\d+) seconds?)?/);
+                        if (match) {
+                            const minutes = parseInt(match[1] || '0');
+                            const seconds = parseInt(match[2] || '0');
+                            const totalSeconds = minutes * 60 + seconds;
+                            showRateLimitMessage(totalSeconds);
+                        }
+                    } else {
+                        // For other errors, check rate limit again after failed attempt
+                        setTimeout(() => {
+                            checkRateLimit(formData.get('username'));
+                        }, 500);
+                    }
+                    
+                    errorMessage.textContent = errorText || 'An unknown error occurred.';
+                    errorModal.classList.remove('hidden');
+                } else {
+                     // If login is successful but no redirect (e.g. API returns 200), go to dashboard
+                    window.location.href = '/dashboard';
+                }
+            });
+
+            closeErrorModal.addEventListener('click', () => {
+                errorModal.classList.add('hidden');
+            });
+
+            // Check for session timeout message
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('reason') === 'idle') {
+                errorMessage.textContent = 'You have been logged out due to inactivity.';
+                errorModal.classList.remove('hidden');
+            }
         });
     </script>
 </body>

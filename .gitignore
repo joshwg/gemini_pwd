@@ -1,4 +1,82 @@
-.air.toml
+# Database files - contain sensitive user data
 passwords.db
-go.mod
-go.sum
+passwords.db-journal
+passwords.db-wal
+passwords.db-shm
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Compiled binaries
+password-manager
+password-manager.exe
+main
+main.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build output directory
+bin/
+/bin/
+
+# Go build artifacts
+*.test
+*.out
+/tmp/
+.DS_Store
+
+# Environment files with secrets
+.env
+.env.local
+.env.production
+.env.staging
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Log files
+*.log
+
+# Backup files
+*.bak
+*.backup
+
+# Temporary files
+*.tmp
+*.temp
+
+# Air live reload tool config (if using)
+.air.toml
+
+# Go module files - these should be committed
+# go.mod and go.sum define dependencies and should be tracked
+
+# Coverage reports
+coverage.txt
+coverage.html
+*.cover
+
+# Vendor directory (if using vendor)
+vendor/
+
+# Test databases
+test.db
+*_test.db

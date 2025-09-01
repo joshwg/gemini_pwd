@@ -2,20 +2,6 @@
 {{define "title"}}Admin{{end}}
 
 {{define "content"}}
-<nav class="bg-white shadow-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
-            <div class="flex-shrink-0">
-                <span class="text-xl font-bold">Password Manager - Admin</span>
-            </div>
-            <div class="flex items-center">
-                <a href="/dashboard" class="text-gray-500 hover:text-gray-700 mr-4">Dashboard</a>
-                <a href="/logout" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Logout</a>
-            </div>
-        </div>
-    </div>
-</nav>
-
 <main class="p-8">
     <h1 class="text-3xl font-bold mb-6">User Management</h1>
 
@@ -26,18 +12,20 @@
             <div>
                 <label for="newUsername" class="block text-gray-700 text-sm font-bold mb-2">Username</label>
                 <input type="text" id="newUsername" name="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                <div id="usernameValidation" class="text-sm mt-1 hidden"></div>
             </div>
             <div class="relative">
-                <label for="newPassword" class="block text-gray-700 text-sm font-bold mb-2">Password</label>
-                <input type="password" id="newPassword" name="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-                <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="newPassword">
+                <label for="createUserPassword" class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                <input type="password" id="createUserPassword" name="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="createUserPassword">
                     <i class="fas fa-eye"></i>
                 </span>
+                <div id="passwordValidation" class="text-sm mt-1 hidden"></div>
             </div>
             <div class="flex items-center mt-6">
                 <label for="newIsAdmin" class="text-gray-700 mr-2">Admin?</label>
                 <input type="checkbox" id="newIsAdmin" name="isAdmin" class="form-checkbox h-5 w-5 text-blue-600">
-                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-auto focus:outline-none focus:shadow-outline">Create User</button>
+                <button type="submit" id="createUserSubmitBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-auto focus:outline-none focus:shadow-outline">Create User</button>
             </div>
         </form>
     </div>
@@ -69,13 +57,14 @@
                         <div class="mb-4">
                             <label for="editUsername" class="block text-gray-700 text-sm font-bold mb-2">Username</label>
                             <input type="text" id="editUsername" name="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                            <div id="editUsernameValidation" class="text-sm mt-1 hidden"></div>
                         </div>
                         <div class="mb-6">
                             <label for="editIsAdmin" class="text-gray-700 mr-2">Admin?</label>
                             <input type="checkbox" id="editIsAdmin" name="isAdmin" class="form-checkbox h-5 w-5 text-blue-600">
                         </div>
                         <div class="mt-4">
-                            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Save Changes</button>
+                            <button type="submit" id="editUserSubmitBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Save Changes</button>
                             <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
                         </div>
                     </form>
@@ -97,6 +86,7 @@
                             <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="newPasswordAdmin">
                                 <i class="fas fa-eye"></i>
                             </span>
+                            <div id="newPasswordAdminValidation" class="text-sm mt-1 hidden"></div>
                         </div>
                         <div class="relative mb-6">
                             <label for="confirmPasswordAdmin" class="block text-gray-700 text-sm font-bold mb-2">Confirm Password</label>
@@ -104,9 +94,10 @@
                             <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="confirmPasswordAdmin">
                                 <i class="fas fa-eye"></i>
                             </span>
+                            <div id="confirmPasswordAdminValidation" class="text-sm mt-1 hidden"></div>
                         </div>
                         <div class="mt-4">
-                            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Change Password</button>
+                            <button type="submit" id="changePasswordSubmitBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Change Password</button>
                             <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
                         </div>
                     </form>
@@ -124,26 +115,244 @@
         const editUserForm = document.getElementById('editUserForm');
         const changePasswordModal = document.getElementById('changePasswordModal');
         const changePasswordForm = document.getElementById('changePasswordForm');
+        const newUsername = document.getElementById('newUsername');
+        const createUserPassword = document.getElementById('createUserPassword');
+        const createUserSubmitBtn = document.getElementById('createUserSubmitBtn');
+        const usernameValidation = document.getElementById('usernameValidation');
+        const passwordValidation = document.getElementById('passwordValidation');
+        const newPasswordAdmin = document.getElementById('newPasswordAdmin');
+        const confirmPasswordAdmin = document.getElementById('confirmPasswordAdmin');
+        const changePasswordSubmitBtn = document.getElementById('changePasswordSubmitBtn');
+        const newPasswordAdminValidation = document.getElementById('newPasswordAdminValidation');
+        const confirmPasswordAdminValidation = document.getElementById('confirmPasswordAdminValidation');
+        const editUsername = document.getElementById('editUsername');
+        const editUserSubmitBtn = document.getElementById('editUserSubmitBtn');
+        const editUsernameValidation = document.getElementById('editUsernameValidation');
+        
         let currentUsername = null;
+        let allUsers = []; // Store all users for validation
 
-        // Toggle password visibility
-        document.querySelectorAll('.toggle-password-visibility').forEach(toggle => {
-            toggle.addEventListener('click', (e) => {
-                const targetId = e.target.closest('.toggle-password-visibility').dataset.target;
-                const passwordInput = document.getElementById(targetId);
-                const icon = e.target.closest('.toggle-password-visibility').querySelector('i');
-                
-                if (passwordInput.type === 'password') {
-                    passwordInput.type = 'text';
-                    icon.classList.remove('fa-eye');
-                    icon.classList.add('fa-eye-slash');
+        // Fetch and render users on page load
+        fetchUsers();
+
+        // Real-time validation for username
+        newUsername.addEventListener('input', validateCreateUserForm);
+        newUsername.addEventListener('blur', validateCreateUserForm);
+        
+        // Real-time validation for password
+        createUserPassword.addEventListener('input', validateCreateUserForm);
+        createUserPassword.addEventListener('blur', validateCreateUserForm);
+
+        function validateCreateUserForm() {
+            const username = newUsername.value.trim();
+            const password = createUserPassword.value;
+            let isUsernameValid = true;
+            let isPasswordValid = true;
+
+            // Validate username
+            newUsername.classList.remove('border-red-500', 'border-green-500');
+            usernameValidation.classList.add('hidden');
+
+            if (username === '') {
+                isUsernameValid = false;
+                newUsername.classList.add('border-red-500');
+                usernameValidation.classList.remove('hidden');
+                usernameValidation.classList.remove('text-green-600');
+                usernameValidation.classList.add('text-red-600');
+                usernameValidation.textContent = 'Username is required';
+            } else {
+                // Check for duplicates
+                const isDuplicate = allUsers.some(user => 
+                    user.Username.toLowerCase() === username.toLowerCase()
+                );
+
+                if (isDuplicate) {
+                    isUsernameValid = false;
+                    newUsername.classList.add('border-red-500');
+                    usernameValidation.classList.remove('hidden');
+                    usernameValidation.classList.remove('text-green-600');
+                    usernameValidation.classList.add('text-red-600');
+                    usernameValidation.textContent = 'A user with this username already exists';
                 } else {
-                    passwordInput.type = 'password';
-                    icon.classList.remove('fa-eye-slash');
-                    icon.classList.add('fa-eye');
+                    // Valid username
+                    newUsername.classList.add('border-green-500');
+                    usernameValidation.classList.remove('hidden');
+                    usernameValidation.classList.remove('text-red-600');
+                    usernameValidation.classList.add('text-green-600');
+                    usernameValidation.textContent = '✓ Valid username';
                 }
-            });
-        });
+            }
+
+            // Validate password
+            createUserPassword.classList.remove('border-red-500', 'border-green-500');
+            passwordValidation.classList.add('hidden');
+
+            if (password === '') {
+                isPasswordValid = false;
+                createUserPassword.classList.add('border-red-500');
+                passwordValidation.classList.remove('hidden');
+                passwordValidation.classList.remove('text-green-600');
+                passwordValidation.classList.add('text-red-600');
+                passwordValidation.textContent = 'Password is required';
+            } else if (password.length < 6) {
+                isPasswordValid = false;
+                createUserPassword.classList.add('border-red-500');
+                passwordValidation.classList.remove('hidden');
+                passwordValidation.classList.remove('text-green-600');
+                passwordValidation.classList.add('text-red-600');
+                passwordValidation.textContent = 'Password must be at least 6 characters';
+            } else {
+                // Valid password
+                createUserPassword.classList.add('border-green-500');
+                passwordValidation.classList.remove('hidden');
+                passwordValidation.classList.remove('text-red-600');
+                passwordValidation.classList.add('text-green-600');
+                passwordValidation.textContent = '✓ Valid password';
+            }
+
+            // Enable/disable submit button
+            const isFormValid = isUsernameValid && isPasswordValid;
+            createUserSubmitBtn.disabled = !isFormValid;
+            if (isFormValid) {
+                createUserSubmitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                createUserSubmitBtn.classList.add('hover:bg-blue-700');
+            } else {
+                createUserSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                createUserSubmitBtn.classList.remove('hover:bg-blue-700');
+            }
+        }
+
+        // Real-time validation for change password form
+        newPasswordAdmin.addEventListener('input', validateChangePasswordForm);
+        newPasswordAdmin.addEventListener('blur', validateChangePasswordForm);
+        confirmPasswordAdmin.addEventListener('input', validateChangePasswordForm);
+        confirmPasswordAdmin.addEventListener('blur', validateChangePasswordForm);
+
+        function validateChangePasswordForm() {
+            const newPassword = newPasswordAdmin.value;
+            const confirmPassword = confirmPasswordAdmin.value;
+            let isNewPasswordValid = true;
+            let isConfirmPasswordValid = true;
+
+            // Validate new password
+            newPasswordAdmin.classList.remove('border-red-500', 'border-green-500');
+            newPasswordAdminValidation.classList.add('hidden');
+
+            if (newPassword === '') {
+                isNewPasswordValid = false;
+                newPasswordAdmin.classList.add('border-red-500');
+                newPasswordAdminValidation.classList.remove('hidden');
+                newPasswordAdminValidation.classList.remove('text-green-600');
+                newPasswordAdminValidation.classList.add('text-red-600');
+                newPasswordAdminValidation.textContent = 'New password is required';
+            } else if (newPassword.length < 6) {
+                isNewPasswordValid = false;
+                newPasswordAdmin.classList.add('border-red-500');
+                newPasswordAdminValidation.classList.remove('hidden');
+                newPasswordAdminValidation.classList.remove('text-green-600');
+                newPasswordAdminValidation.classList.add('text-red-600');
+                newPasswordAdminValidation.textContent = 'Password must be at least 6 characters';
+            } else {
+                // Valid new password
+                newPasswordAdmin.classList.add('border-green-500');
+                newPasswordAdminValidation.classList.remove('hidden');
+                newPasswordAdminValidation.classList.remove('text-red-600');
+                newPasswordAdminValidation.classList.add('text-green-600');
+                newPasswordAdminValidation.textContent = '✓ Valid password';
+            }
+
+            // Validate confirm password
+            confirmPasswordAdmin.classList.remove('border-red-500', 'border-green-500');
+            confirmPasswordAdminValidation.classList.add('hidden');
+
+            if (confirmPassword === '') {
+                isConfirmPasswordValid = false;
+                confirmPasswordAdmin.classList.add('border-red-500');
+                confirmPasswordAdminValidation.classList.remove('hidden');
+                confirmPasswordAdminValidation.classList.remove('text-green-600');
+                confirmPasswordAdminValidation.classList.add('text-red-600');
+                confirmPasswordAdminValidation.textContent = 'Please confirm your password';
+            } else if (newPassword !== confirmPassword) {
+                isConfirmPasswordValid = false;
+                confirmPasswordAdmin.classList.add('border-red-500');
+                confirmPasswordAdminValidation.classList.remove('hidden');
+                confirmPasswordAdminValidation.classList.remove('text-green-600');
+                confirmPasswordAdminValidation.classList.add('text-red-600');
+                confirmPasswordAdminValidation.textContent = 'Passwords do not match';
+            } else if (confirmPassword.length >= 6) {
+                // Valid confirm password
+                confirmPasswordAdmin.classList.add('border-green-500');
+                confirmPasswordAdminValidation.classList.remove('hidden');
+                confirmPasswordAdminValidation.classList.remove('text-red-600');
+                confirmPasswordAdminValidation.classList.add('text-green-600');
+                confirmPasswordAdminValidation.textContent = '✓ Passwords match';
+            }
+
+            // Enable/disable submit button
+            const isFormValid = isNewPasswordValid && isConfirmPasswordValid && newPassword === confirmPassword && newPassword.length >= 6;
+            changePasswordSubmitBtn.disabled = !isFormValid;
+            if (isFormValid) {
+                changePasswordSubmitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                changePasswordSubmitBtn.classList.add('hover:bg-blue-700');
+            } else {
+                changePasswordSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                changePasswordSubmitBtn.classList.remove('hover:bg-blue-700');
+            }
+        }
+
+        // Real-time validation for edit user form
+        editUsername.addEventListener('input', validateEditUserForm);
+        editUsername.addEventListener('blur', validateEditUserForm);
+
+        function validateEditUserForm() {
+            const username = editUsername.value.trim();
+            let isValid = true;
+
+            // Reset styles
+            editUsername.classList.remove('border-red-500', 'border-green-500');
+            editUsernameValidation.classList.add('hidden');
+
+            if (username === '') {
+                isValid = false;
+                editUsername.classList.add('border-red-500');
+                editUsernameValidation.classList.remove('hidden');
+                editUsernameValidation.classList.remove('text-green-600');
+                editUsernameValidation.classList.add('text-red-600');
+                editUsernameValidation.textContent = 'Username is required';
+            } else {
+                // Check for duplicates (excluding current user)
+                const isDuplicate = allUsers.some(user => 
+                    user.Username.toLowerCase() === username.toLowerCase() && 
+                    user.Username !== currentUsername
+                );
+
+                if (isDuplicate) {
+                    isValid = false;
+                    editUsername.classList.add('border-red-500');
+                    editUsernameValidation.classList.remove('hidden');
+                    editUsernameValidation.classList.remove('text-green-600');
+                    editUsernameValidation.classList.add('text-red-600');
+                    editUsernameValidation.textContent = 'A user with this username already exists';
+                } else {
+                    // Valid username
+                    editUsername.classList.add('border-green-500');
+                    editUsernameValidation.classList.remove('hidden');
+                    editUsernameValidation.classList.remove('text-red-600');
+                    editUsernameValidation.classList.add('text-green-600');
+                    editUsernameValidation.textContent = '✓ Valid username';
+                }
+            }
+
+            // Enable/disable submit button
+            editUserSubmitBtn.disabled = !isValid;
+            if (isValid) {
+                editUserSubmitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                editUserSubmitBtn.classList.add('hover:bg-blue-700');
+            } else {
+                editUserSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                editUserSubmitBtn.classList.remove('hover:bg-blue-700');
+            }
+        }
 
         // Fetch and render users on page load
         fetchUsers();
@@ -151,27 +360,46 @@
         // Event listener for user creation form submission
         createUserForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // Don't submit if validation fails
+            if (createUserSubmitBtn.disabled) {
+                return;
+            }
+            
             const formData = new FormData(e.target);
             const data = {
-                username: formData.get('username'),
+                username: formData.get('username').trim(),
                 password: formData.get('password'),
                 isAdmin: formData.get('isAdmin') === 'on'
             };
 
-            const response = await fetch(`${window.location.origin}/api/users`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
+            try {
+                const response = await fetch(`${window.location.origin}/api/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
 
-            if (response.ok) {
-                console.log('User created successfully!');
-                e.target.reset(); // Clear form fields
-                fetchUsers(); // Refresh the user list
-            } else {
-                console.error('Failed to create user.');
-                const errorText = await response.text();
-                alert('Error: ' + errorText);
+                if (response.ok) {
+                    console.log('User created successfully!');
+                    e.target.reset(); // Clear form fields
+                    // Reset validation state after successful creation
+                    newUsername.classList.remove('border-red-500', 'border-green-500');
+                    createUserPassword.classList.remove('border-red-500', 'border-green-500');
+                    usernameValidation.classList.add('hidden');
+                    passwordValidation.classList.add('hidden');
+                    createUserSubmitBtn.disabled = true;
+                    createUserSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    createUserSubmitBtn.classList.remove('hover:bg-blue-700');
+                    await fetchUsers(); // Refresh the user list for validation
+                } else {
+                    console.error('Failed to create user.');
+                    const errorText = await response.text();
+                    alert('Error: ' + errorText);
+                }
+            } catch (error) {
+                console.error('Error creating user:', error);
+                alert('An error occurred while creating the user.');
             }
         });
 
@@ -199,9 +427,19 @@
                 document.getElementById('editUsername').value = currentUsername;
                 document.getElementById('editIsAdmin').checked = isAdmin;
                 editUserModal.classList.remove('hidden');
+                // Trigger validation for the current username
+                validateEditUserForm();
             } else if (e.target.closest('.change-password-btn')) {
                 currentUsername = e.target.closest('.change-password-btn').dataset.username;
                 document.getElementById('changePasswordUser').textContent = currentUsername;
+                // Reset validation state when opening modal
+                newPasswordAdmin.classList.remove('border-red-500', 'border-green-500');
+                confirmPasswordAdmin.classList.remove('border-red-500', 'border-green-500');
+                newPasswordAdminValidation.classList.add('hidden');
+                confirmPasswordAdminValidation.classList.add('hidden');
+                changePasswordSubmitBtn.disabled = true;
+                changePasswordSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                changePasswordSubmitBtn.classList.remove('hover:bg-blue-700');
                 changePasswordModal.classList.remove('hidden');
             }
         });
@@ -209,67 +447,157 @@
         // Event listener for edit user form submission
         editUserForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // Don't submit if validation fails
+            if (editUserSubmitBtn.disabled) {
+                return;
+            }
+            
             const formData = new FormData(e.target);
-            const data = {
-                username: currentUsername, // The user to update
-                newUsername: formData.get('username'),
-                isAdmin: formData.get('isAdmin') === 'on'
-            };
+            const newUsername = formData.get('username').trim();
+            const isAdmin = formData.get('isAdmin') === 'on';
 
-            const response = await fetch(`${window.location.origin}/api/users`, {
+            let updatePromises = [];
+
+            // Update username if it has changed
+            if (newUsername !== currentUsername) {
+                const renamePayload = { username: currentUsername, newUsername: newUsername };
+                const renamePromise = fetch(`${window.location.origin}/api/users`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(renamePayload)
+                });
+                updatePromises.push(renamePromise);
+            }
+
+            // Always update admin status
+            const adminPayload = { username: newUsername, isAdmin: isAdmin };
+            const adminPromise = fetch(`${window.location.origin}/api/users`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: JSON.stringify(adminPayload)
             });
+            updatePromises.push(adminPromise);
 
-            if (response.ok) {
-                console.log('User updated successfully!');
-                editUserModal.classList.add('hidden');
-                fetchUsers();
-            } else {
-                console.error('Failed to update user.');
-                const errorText = await response.text();
-                alert('Error: ' + errorText);
+            try {
+                const responses = await Promise.all(updatePromises);
+                const allOk = responses.every(res => res.ok);
+
+                if (allOk) {
+                    console.log('User updated successfully!');
+                    editUserModal.classList.add('hidden');
+                    fetchUsers();
+                } else {
+                    console.error('Failed to update user.');
+                    for (const res of responses) {
+                        if (!res.ok) {
+                            const errorText = await res.text();
+                            alert('Error: ' + errorText);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('An error occurred during user update:', error);
+                alert('An unexpected error occurred. See console for details.');
             }
         });
 
         // Event listener for change password form submission
         changePasswordForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const newPassword = document.getElementById('newPasswordAdmin').value;
-            const confirmPassword = document.getElementById('confirmPasswordAdmin').value;
-
-            if (newPassword !== confirmPassword) {
-                alert('Passwords do not match.');
+            
+            // Don't submit if validation fails
+            if (changePasswordSubmitBtn.disabled) {
                 return;
             }
+            
+            const newPassword = newPasswordAdmin.value;
+            const confirmPassword = confirmPasswordAdmin.value;
 
             const data = {
                 username: currentUsername,
                 newPassword: newPassword
             };
 
-            const response = await fetch(`${window.location.origin}/api/users`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
+            try {
+                const response = await fetch(`${window.location.origin}/api/users`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
 
-            if (response.ok) {
-                console.log('Password changed successfully!');
-                changePasswordModal.classList.add('hidden');
-            } else {
-                console.error('Failed to change password.');
-                const errorText = await response.text();
-                alert('Error: ' + errorText);
+                if (response.ok) {
+                    console.log('Password changed successfully!');
+                    changePasswordForm.reset();
+                    // Reset validation state
+                    newPasswordAdmin.classList.remove('border-red-500', 'border-green-500');
+                    confirmPasswordAdmin.classList.remove('border-red-500', 'border-green-500');
+                    newPasswordAdminValidation.classList.add('hidden');
+                    confirmPasswordAdminValidation.classList.add('hidden');
+                    changePasswordSubmitBtn.disabled = true;
+                    changePasswordSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    changePasswordSubmitBtn.classList.remove('hover:bg-blue-700');
+                    // Reset password fields to password type and icons to eye
+                    const passwordInputs = changePasswordForm.querySelectorAll('input[type="text"][id*="Password"]');
+                    passwordInputs.forEach(input => {
+                        input.type = 'password';
+                    });
+                    const eyeIcons = changePasswordForm.querySelectorAll('.toggle-password-visibility i');
+                    eyeIcons.forEach(icon => {
+                        icon.classList.remove('fa-eye-slash');
+                        icon.classList.add('fa-eye');
+                    });
+                    changePasswordModal.classList.add('hidden');
+                    alert('Password changed successfully!');
+                } else {
+                    console.error('Failed to change password.');
+                    const errorText = await response.text();
+                    alert('Error: ' + errorText);
+                }
+            } catch (error) {
+                console.error('Error changing password:', error);
+                alert('An error occurred while changing the password.');
             }
         });
 
-        // Close modals
-        document.querySelectorAll('.close-modal').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.target.closest('.fixed').classList.add('hidden');
-            });
+        // Close modals and reset forms
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('close-modal')) {
+                const modal = e.target.closest('.fixed');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    // Reset forms when closing modals
+                    const form = modal.querySelector('form');
+                    if (form) {
+                        form.reset();
+                        // Reset password fields to password type and eye icons will be handled by common code
+                        const passwordInputs = form.querySelectorAll('input[type="text"][id*="Password"]');
+                        passwordInputs.forEach(input => {
+                            input.type = 'password';
+                        });
+                        
+                        // Reset validation states for change password modal
+                        if (modal.id === 'changePasswordModal') {
+                            newPasswordAdmin.classList.remove('border-red-500', 'border-green-500');
+                            confirmPasswordAdmin.classList.remove('border-red-500', 'border-green-500');
+                            newPasswordAdminValidation.classList.add('hidden');
+                            confirmPasswordAdminValidation.classList.add('hidden');
+                            changePasswordSubmitBtn.disabled = true;
+                            changePasswordSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                            changePasswordSubmitBtn.classList.remove('hover:bg-blue-700');
+                        }
+                        
+                        // Reset validation states for edit user modal
+                        if (modal.id === 'editUserModal') {
+                            editUsername.classList.remove('border-red-500', 'border-green-500');
+                            editUsernameValidation.classList.add('hidden');
+                            editUserSubmitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                            editUserSubmitBtn.classList.add('hover:bg-blue-700');
+                            editUserSubmitBtn.disabled = false;
+                        }
+                    }
+                }
+            }
         });
 
         // Function to fetch users and populate the table
@@ -279,7 +607,8 @@
                 if (!response.ok) {
                     throw new Error('Failed to fetch users');
                 }
-                const users = await response.json() || [];
+                const users = await response.json();
+                allUsers = users; // Store users for validation
                 userTableBody.innerHTML = ''; // Clear existing rows
                 users.forEach(user => {
                     const row = document.createElement('tr');
