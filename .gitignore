@@ -11,10 +11,16 @@ passwords.db-shm
 # Compiled binaries
 password-manager
 password-manager.exe
+main
+main.exe
 *.exe
 *.dll
 *.so
 *.dylib
+
+# Build output directory
+bin/
+/bin/
 
 # Go build artifacts
 *.test

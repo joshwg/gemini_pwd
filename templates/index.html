@@ -8,7 +8,7 @@
             <h2 class="text-2xl font-semibold">Your Passwords</h2>
             <div class="flex items-center">
                 <input type="text" id="searchPassword" placeholder="Search passwords..." class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline mr-4">
-                <button id="createPasswordBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                <button id="createPasswordBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" title="Create a new password entry">
                     <i class="fas fa-plus mr-2"></i>New Password
                 </button>
             </div>
@@ -18,6 +18,8 @@
                 <tr>
                     <th class="py-3 px-6 text-left">Site</th>
                     <th class="py-3 px-6 text-left">Username</th>
+                    <th class="py-3 px-6 text-left">Password</th>
+                    <th class="py-3 px-6 text-left">Notes</th>
                     <th class="py-3 px-6 text-left">Tags</th>
                     <th class="py-3 px-6 text-center">Actions</th>
                 </tr>
@@ -40,39 +42,43 @@
                     <input type="hidden" id="passwordID" name="id">
                     <div class="mb-4">
                         <label for="passwordSite" class="block text-gray-700 text-sm font-bold mb-2 text-left">Site</label>
-                        <input type="text" id="passwordSite" name="site" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                        <input type="text" id="passwordSite" name="site" maxlength="256" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                        <div id="passwordSiteValidation" class="text-sm mt-1 hidden"></div>
                     </div>
                     <div class="mb-4">
                         <label for="passwordUsername" class="block text-gray-700 text-sm font-bold mb-2 text-left">Username</label>
-                        <input type="text" id="passwordUsername" name="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                        <input type="text" id="passwordUsername" name="username" maxlength="128" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                        <div id="passwordUsernameValidation" class="text-sm mt-1 hidden"></div>
                     </div>
                     <div class="mb-4 relative">
                         <label for="passwordValue" class="block text-gray-700 text-sm font-bold mb-2 text-left">Password</label>
-                        <input type="password" id="passwordValue" name="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                        <input type="password" id="passwordValue" name="password" maxlength="128" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
                         <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="passwordValue">
                             <i class="fas fa-eye"></i>
                         </span>
+                        <div id="passwordValueValidation" class="text-sm mt-1 hidden"></div>
                     </div>
                     <div class="mb-4">
                         <label for="passwordNotes" class="block text-gray-700 text-sm font-bold mb-2 text-left">Notes</label>
-                        <textarea id="passwordNotes" name="notes" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
+                        <textarea id="passwordNotes" name="notes" rows="6" maxlength="4096" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline resize-vertical"></textarea>
+                        <div id="passwordNotesValidation" class="text-sm mt-1 hidden"></div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                         <div>
                             <label class="block text-gray-700 text-sm font-bold mb-2 text-left">Available Tags</label>
-                            <div id="tagList" class="flex flex-wrap gap-2 p-2 border rounded-md bg-gray-100 h-48 overflow-y-auto">
+                            <div id="tagList" class="flex flex-wrap items-start gap-2 p-2 border rounded-md bg-gray-300 h-32 overflow-y-auto">
                                 <!-- Available tags will be populated here -->
                             </div>
                         </div>
                         <div>
                             <label class="block text-gray-700 text-sm font-bold mb-2 text-left">Password Tags</label>
-                            <div id="passwordTagsContainer" class="flex flex-wrap gap-2 p-2 border rounded-md min-h-[40px] bg-gray-50 h-48 overflow-y-auto">
+                            <div id="passwordTagsContainer" class="flex flex-wrap items-start gap-2 p-2 border rounded-md bg-gray-300 h-32 overflow-y-auto min-h-[40px]">
                                 <!-- Tags associated with the password will be dropped here -->
                             </div>
                         </div>
                     </div>
                     <div class="mt-4">
-                        <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Save</button>
+                        <button type="submit" id="passwordSubmitBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>Save</button>
                         <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
                     </div>
                 </form>
@@ -80,6 +86,36 @@
         </div>
     </div>
 </div>
+
+<style>
+    /* Enhanced interactivity for available tags */
+    #tagList .tag-item {
+        transition: all 0.2s ease;
+        user-select: none;
+    }
+    
+    #tagList .tag-item:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        opacity: 0.9;
+    }
+    
+    #tagList .tag-item:active {
+        transform: translateY(0);
+    }
+    
+    /* Mobile touch feedback */
+    @media (hover: none) and (pointer: coarse) {
+        #tagList .tag-item {
+            cursor: pointer !important;
+        }
+        
+        #tagList .tag-item:active {
+            transform: scale(0.98);
+            opacity: 0.8;
+        }
+    }
+</style>
 
 <script>
     const API_ORIGIN = window.location.origin;
@@ -97,9 +133,65 @@
         const passwordValue = document.getElementById('passwordValue');
         const passwordNotes = document.getElementById('passwordNotes');
         const passwordTagsContainer = document.getElementById('passwordTagsContainer');
+        
+        // Password validation elements
+        const passwordSiteValidation = document.getElementById('passwordSiteValidation');
+        const passwordUsernameValidation = document.getElementById('passwordUsernameValidation');
+        const passwordValueValidation = document.getElementById('passwordValueValidation');
+        const passwordSubmitBtn = document.getElementById('passwordSubmitBtn');
 
         let allTags = [];
         let draggedTag = null;
+        
+        // Function to determine text color based on background color brightness
+        function getTextColor(backgroundColor) {
+            // Convert hex to RGB
+            const hex = backgroundColor.replace('#', '');
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            
+            // Calculate brightness using relative luminance formula
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+            
+            // Return black for light colors, white for dark colors
+            return brightness > 155 ? '#000000' : '#FFFFFF';
+        }
+        
+        // Function to get border style for tags based on background brightness
+        function getBorderStyle(backgroundColor) {
+            // Convert hex to RGB
+            const hex = backgroundColor.replace('#', '');
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            
+            // Calculate brightness using relative luminance formula
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+            
+            // For very light colors (brightness > 220), use a darker border
+            if (brightness > 220) {
+                return '2px solid #666666'; // Dark gray border for very light tags
+            } else if (brightness > 180) {
+                return '1px solid #777777'; // Medium gray border for light tags
+            } else {
+                return '1px solid #eeeeee'; // Light gray border for darker tags
+            }
+        }
+        
+        // Function to sort tags alphabetically within a container
+        function sortTagsInContainer(container) {
+            const tags = Array.from(container.querySelectorAll('.tag-item'));
+            tags.sort((a, b) => {
+                const nameA = a.dataset.name.toLowerCase();
+                const nameB = b.dataset.name.toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+            
+            // Remove all tags and re-add them in sorted order
+            tags.forEach(tag => tag.remove());
+            tags.forEach(tag => container.appendChild(tag));
+        }
         
         // Fetch and render passwords and tags on page load
         fetchPasswords();
@@ -110,18 +202,78 @@
             fetchPasswords(searchPasswordInput.value);
         });
 
+        // Function to check for duplicate passwords via API
+        async function checkPasswordDuplicate(site, username, id = null) {
+            try {
+                const response = await fetch('/api/passwords/check-duplicate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        site: site,
+                        username: username,
+                        id: id
+                    })
+                });
+                
+                if (!response.ok) {
+                    // Log the error but don't throw - return false to allow form submission
+                    console.error('Duplicate check failed:', response.status, response.statusText);
+                    return false;
+                }
+                
+                const result = await response.json();
+                // Ensure we return a boolean value, never undefined or null
+                return Boolean(result && result.isDuplicate);
+            } catch (e) {
+                // Log error but return false to avoid blocking user
+                console.error('Error checking duplicate:', e);
+                return false;
+            }
+        }
+
         // Open password creation modal
         createPasswordBtn.addEventListener('click', () => {
             passwordModalTitle.textContent = 'Create New Password';
             passwordForm.reset();
             passwordID.value = '';
             passwordTagsContainer.innerHTML = '';
+            // Reset validation state
+            passwordSiteValidation.classList.add('hidden');
+            passwordUsernameValidation.classList.add('hidden');
+            passwordValueValidation.classList.add('hidden');
+            const notesValidation = document.getElementById('passwordNotesValidation');
+            if (notesValidation) {
+                notesValidation.classList.add('hidden');
+            }
+            passwordSubmitBtn.disabled = true;
+            // Reset validation cache
+            lastValidationParams = null;
+            clearTimeout(validationTimeout);
+            // Reset password field type and icon using global function
+            if (typeof resetPasswordToggles === 'function') {
+                resetPasswordToggles();
+            }
+            // Refresh available tags to show all tags
+            refreshAvailableTags();
             passwordModal.classList.remove('hidden');
+            
+            // Run initial validation to set proper button state
+            setTimeout(() => {
+                performRealTimeValidation();
+            }, 100);
         });
 
         // Handle form submissions for passwords
         passwordForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // Check validation before submitting
+            if (!validatePasswordForm()) {
+                return;
+            }
+            
             const tags = Array.from(passwordTagsContainer.querySelectorAll('.tag-item')).map(tag => tag.dataset.name);
             
             const data = {
@@ -133,7 +285,7 @@
             };
 
             const method = passwordID.value ? 'PUT' : 'POST';
-            const url = passwordID.value ? `${API_ORIGIN}/api/passwords?id=${passwordID.value}` : `${API_ORIGIN}/api/passwords`;
+            const url = passwordID.value ? (API_ORIGIN + '/api/passwords?id=' + passwordID.value) : (API_ORIGIN + '/api/passwords');
 
             const response = await fetch(url, {
                 method: method,
@@ -154,29 +306,10 @@
 
         // Event delegation for table and tag list buttons
         document.addEventListener('click', async (e) => {
-            const toggleBtn = e.target.closest('.toggle-password-visibility');
-            if (toggleBtn) {
-                const targetId = toggleBtn.dataset.target;
-                const passwordInput = document.getElementById(targetId);
-                if (passwordInput) {
-                    const icon = toggleBtn.querySelector('i');
-                    if (passwordInput.type === 'password') {
-                        passwordInput.type = 'text';
-                        icon.classList.remove('fa-eye');
-                        icon.classList.add('fa-eye-slash');
-                    } else {
-                        passwordInput.type = 'password';
-                        icon.classList.remove('fa-eye-slash');
-                        icon.classList.add('fa-eye');
-                    }
-                }
-                return; // Stop further processing
-            }
-
             if (e.target.closest('.delete-password-btn')) {
                 const id = e.target.closest('.delete-password-btn').dataset.id;
                 if (confirm('Are you sure you want to delete this password?')) {
-                    const response = await fetch(`${API_ORIGIN}/api/passwords?id=${id}`, { method: 'DELETE' });
+                    const response = await fetch(API_ORIGIN + '/api/passwords?id=' + id, { method: 'DELETE' });
                     if (response.ok) {
                         fetchPasswords();
                     } else {
@@ -189,10 +322,180 @@
             } else if (e.target.closest('.copy-password-btn')) {
                 const id = e.target.closest('.copy-password-btn').dataset.id;
                 copyPassword(id);
+            } else if (e.target.closest('.show-password-btn')) {
+                const id = e.target.closest('.show-password-btn').dataset.id;
+                showHidePassword(id);
+            } else if (e.target.closest('.show-notes-btn')) {
+                const id = e.target.closest('.show-notes-btn').dataset.id;
+                showHideNotes(id);
             } else if (e.target.closest('.close-modal')) {
+                // Reset validation state when closing modal
+                if (e.target.closest('#passwordModal')) {
+                    passwordSiteValidation.classList.add('hidden');
+                    passwordUsernameValidation.classList.add('hidden');
+                    passwordValueValidation.classList.add('hidden');
+                    const notesValidation = document.getElementById('passwordNotesValidation');
+                    if (notesValidation) {
+                        notesValidation.classList.add('hidden');
+                    }
+                    passwordSubmitBtn.disabled = true;
+                    // Reset validation cache
+                    lastValidationParams = null;
+                    clearTimeout(validationTimeout);
+                    // Reset password field type and icon using global function
+                    if (typeof resetPasswordToggles === 'function') {
+                        resetPasswordToggles();
+                    }
+                    // Refresh available tags to restore all tags
+                    refreshAvailableTags();
+                }
                 e.target.closest('.fixed').classList.add('hidden');
             }
         });
+
+        // Password form validation
+        function validatePasswordForm() {
+            let isValid = true;
+
+            // Validate site field
+            const site = passwordSite.value.trim();
+            if (site === '') {
+                passwordSiteValidation.textContent = 'Site is required';
+                passwordSiteValidation.className = 'text-sm mt-1 text-red-600';
+                passwordSiteValidation.classList.remove('hidden');
+                isValid = false;
+            } else if (site.length > 256) {
+                passwordSiteValidation.textContent = 'Site must be 256 characters or less';
+                passwordSiteValidation.className = 'text-sm mt-1 text-red-600';
+                passwordSiteValidation.classList.remove('hidden');
+                isValid = false;
+            } else {
+                passwordSiteValidation.classList.add('hidden');
+            }
+
+            // Validate username field
+            const username = passwordUsername.value.trim();
+            if (username === '') {
+                passwordUsernameValidation.textContent = 'Username is required';
+                passwordUsernameValidation.className = 'text-sm mt-1 text-red-600';
+                passwordUsernameValidation.classList.remove('hidden');
+                isValid = false;
+            } else if (username.length > 128) {
+                passwordUsernameValidation.textContent = 'Username must be 128 characters or less';
+                passwordUsernameValidation.className = 'text-sm mt-1 text-red-600';
+                passwordUsernameValidation.classList.remove('hidden');
+                isValid = false;
+            } else {
+                // Check for duplicates asynchronously
+                checkDuplicateAsync(site, username, passwordID.value);
+            }
+
+            // Validate password field (optional, but with length limits)
+            const password = passwordValue.value;
+            if (password.length > 128) {
+                passwordValueValidation.textContent = 'Password must be 128 characters or less';
+                passwordValueValidation.className = 'text-sm mt-1 text-red-600';
+                passwordValueValidation.classList.remove('hidden');
+                isValid = false;
+            } else {
+                passwordValueValidation.classList.add('hidden');
+            }
+
+            // Validate notes field (optional, but with length limits)
+            const notes = passwordNotes.value;
+            if (notes.length > 4096) {
+                // Add validation div for notes if it doesn't exist
+                let notesValidation = document.getElementById('passwordNotesValidation');
+                if (!notesValidation) {
+                    notesValidation = document.createElement('div');
+                    notesValidation.id = 'passwordNotesValidation';
+                    notesValidation.className = 'text-sm mt-1 hidden';
+                    passwordNotes.parentNode.appendChild(notesValidation);
+                }
+                notesValidation.textContent = 'Notes must be 4096 characters or less';
+                notesValidation.className = 'text-sm mt-1 text-red-600';
+                notesValidation.classList.remove('hidden');
+                isValid = false;
+            } else {
+                const notesValidation = document.getElementById('passwordNotesValidation');
+                if (notesValidation) {
+                    notesValidation.classList.add('hidden');
+                }
+            }
+
+            // Enable/disable submit button
+            passwordSubmitBtn.disabled = !isValid;
+            return isValid;
+        }
+
+        // Async function to check for duplicates
+        async function checkDuplicateAsync(site, username, currentID) {
+            const currentIDNumber = currentID ? parseInt(currentID) : null;
+            
+            // Only check for duplicates when creating new password or editing with different site/username
+            if (site && username) {
+                try {
+                    const isDuplicate = await checkPasswordDuplicate(site, username, currentIDNumber);
+                    
+                    if (isDuplicate) {
+                        passwordUsernameValidation.textContent = 'A password for this site and username already exists';
+                        passwordUsernameValidation.className = 'text-sm mt-1 text-red-600';
+                        passwordUsernameValidation.classList.remove('hidden');
+                        passwordSubmitBtn.disabled = true;
+                    } else {
+                        passwordUsernameValidation.classList.add('hidden');
+                        // Re-run basic validation to update submit button state
+                        validatePasswordForm();
+                    }
+                } catch (e) {
+                    console.error('Error in checkDuplicateAsync:', e);
+                    // On error, hide validation and allow form submission
+                    passwordUsernameValidation.classList.add('hidden');
+                    validatePasswordForm();
+                }
+            } else {
+                passwordUsernameValidation.classList.add('hidden');
+            }
+        }
+
+        // Real-time validation function that combines basic validation and duplicate checking
+        let validationTimeout;
+        let lastValidationParams = null; // Cache to avoid duplicate API calls
+        
+        function performRealTimeValidation() {
+            // Clear existing timeout
+            clearTimeout(validationTimeout);
+            
+            // Run basic validation immediately
+            const basicValidationPassed = validatePasswordForm();
+            
+            // If basic validation passes, check for duplicates with delay
+            if (basicValidationPassed) {
+                const site = passwordSite.value.trim();
+                const username = passwordUsername.value.trim();
+                const currentID = passwordID.value;
+                
+                // Create a key for caching to avoid duplicate API calls
+                const validationKey = `${site}|${username}|${currentID}`;
+                
+                // Only make API call if parameters have changed
+                if (site && username && validationKey !== lastValidationParams) {
+                    validationTimeout = setTimeout(async () => {
+                        lastValidationParams = validationKey;
+                        await checkDuplicateAsync(site, username, currentID);
+                    }, 500); // 500ms delay to avoid too many API calls
+                }
+            } else {
+                // If basic validation fails, clear the cache
+                lastValidationParams = null;
+            }
+        }
+
+        // Add event listeners for real-time validation on all form fields
+        passwordSite.addEventListener('input', performRealTimeValidation);
+        passwordUsername.addEventListener('input', performRealTimeValidation);
+        passwordValue.addEventListener('input', performRealTimeValidation);
+        passwordNotes.addEventListener('input', performRealTimeValidation);
 
         // Drag and drop for tags
         document.getElementById('tagList')?.addEventListener('dragstart', (e) => {
@@ -209,34 +512,72 @@
         passwordTagsContainer.addEventListener('drop', (e) => {
             e.preventDefault();
             if (draggedTag) {
-                const tagId = draggedTag.dataset.id;
-                const tagName = draggedTag.dataset.name;
-                const tagColor = draggedTag.dataset.color;
-                
-                // Prevent duplicate tags
-                if (!passwordTagsContainer.querySelector(`[data-id="${tagId}"]`)) {
-                    const tagElement = document.createElement('span');
-                    tagElement.className = 'tag-item text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full last:mr-0 mr-1 cursor-pointer break-all';
-                    tagElement.style.backgroundColor = tagColor;
-                    tagElement.style.color = '#FFFFFF';
-                    tagElement.dataset.id = tagId;
-                    tagElement.dataset.name = tagName;
-                    tagElement.draggable = true;
-                    tagElement.textContent = tagName;
-                    tagElement.addEventListener('click', () => tagElement.remove());
-                    passwordTagsContainer.appendChild(tagElement);
-                }
+                addTagToPassword(draggedTag);
                 draggedTag = null;
             }
         });
 
+        // Function to refresh available tags after tag is removed from password tags
+        function refreshAvailableTags() {
+            if (window.allAvailableTags) {
+                renderTags(window.allAvailableTags);
+            }
+        }
+
+        // Function to add a tag to password tags (used by both drag/drop and click)
+        function addTagToPassword(sourceTagElement) {
+            const tagId = sourceTagElement.dataset.id;
+            const tagName = sourceTagElement.dataset.name;
+            const tagColor = sourceTagElement.dataset.color;
+            
+            // Prevent duplicate tags
+            if (passwordTagsContainer.querySelector('[data-id="' + tagId + '"]')) {
+                return false; // Tag already exists
+            }
+            
+            const tagElement = document.createElement('span');
+            tagElement.className = 'tag-item text-xs font-semibold inline-block py-0.5 px-3 rounded border last:mr-0 mr-1 cursor-pointer break-all';
+            tagElement.style.backgroundColor = tagColor;
+            tagElement.style.color = getTextColor(tagColor);
+            tagElement.style.border = getBorderStyle(tagColor);
+            tagElement.dataset.id = tagId;
+            tagElement.dataset.name = tagName;
+            tagElement.dataset.color = tagColor;
+            tagElement.draggable = true;
+            tagElement.textContent = tagName;
+            tagElement.addEventListener('click', () => {
+                tagElement.remove();
+                // Add tag back to available tags when removed
+                refreshAvailableTags();
+                // Sort remaining password tags
+                sortTagsInContainer(passwordTagsContainer);
+                // Trigger validation when tags change
+                performRealTimeValidation();
+            });
+            passwordTagsContainer.appendChild(tagElement);
+            
+            // Sort tags in the password tags container
+            sortTagsInContainer(passwordTagsContainer);
+            
+            // Remove tag from available tags
+            sourceTagElement.remove();
+            
+            // Sort remaining available tags
+            sortTagsInContainer(tagListContainer);
+            
+            // Trigger validation when tags are added
+            performRealTimeValidation();
+            
+            return true; // Tag successfully added
+        }
+
         // Helper functions
         async function fetchPasswords(query = '') {
             try {
-                const response = await fetch(`${API_ORIGIN}/api/passwords?q=${encodeURIComponent(query)}`);
+                const response = await fetch(API_ORIGIN + '/api/passwords?q=' + encodeURIComponent(query));
                 if (!response.ok) {
                     const errorText = await response.text();
-                    throw new Error(`Failed to fetch passwords: ${response.status} ${response.statusText} - ${errorText}`);
+                    throw new Error('Failed to fetch passwords: ' + response.status + ' ' + response.statusText + ' - ' + errorText);
                 }
                 const passwords = await response.json() || [];
                 renderPasswords(passwords);
@@ -248,7 +589,7 @@
         
         async function fetchPasswordByID(id) {
             try {
-                const response = await fetch(`${API_ORIGIN}/api/passwords?id=${id}`);
+                const response = await fetch(API_ORIGIN + '/api/passwords?id=' + id);
                 if (!response.ok) throw new Error('Failed to fetch password.');
                 const password = await response.json();
                 passwordModalTitle.textContent = 'Edit Password';
@@ -261,16 +602,54 @@
                 passwordTagsContainer.innerHTML = '';
                 password.tags.forEach(tag => {
                     const tagElement = document.createElement('span');
-                    tagElement.className = 'tag-item text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full last:mr-0 mr-1 cursor-pointer break-all';
+                    tagElement.className = 'tag-item text-xs font-semibold inline-block py-0.5 px-3 rounded border last:mr-0 mr-1 cursor-pointer break-all';
                     tagElement.style.backgroundColor = tag.color;
-                    tagElement.style.color = '#FFFFFF';
+                    tagElement.style.color = getTextColor(tag.color);
+                    tagElement.style.border = getBorderStyle(tag.color);
                     tagElement.dataset.id = tag.id;
                     tagElement.dataset.name = tag.name;
+                    tagElement.dataset.color = tag.color;
                     tagElement.draggable = true;
                     tagElement.textContent = tag.name;
-                    tagElement.addEventListener('click', () => tagElement.remove());
+                    tagElement.addEventListener('click', () => {
+                        tagElement.remove();
+                        // Add tag back to available tags when removed
+                        refreshAvailableTags();
+                        // Sort remaining password tags
+                        sortTagsInContainer(passwordTagsContainer);
+                        // Trigger validation when tags change
+                        performRealTimeValidation();
+                    });
                     passwordTagsContainer.appendChild(tagElement);
                 });
+                
+                // Sort the password tags
+                sortTagsInContainer(passwordTagsContainer);
+                
+                // Refresh available tags to exclude already used ones
+                refreshAvailableTags();
+                
+                // Reset validation state and trigger validation
+                passwordSiteValidation.classList.add('hidden');
+                passwordUsernameValidation.classList.add('hidden');
+                passwordValueValidation.classList.add('hidden');
+                const notesValidation = document.getElementById('passwordNotesValidation');
+                if (notesValidation) {
+                    notesValidation.classList.add('hidden');
+                }
+                // Reset validation cache
+                lastValidationParams = null;
+                clearTimeout(validationTimeout);
+                // Reset password field type and icon using global function
+                if (typeof resetPasswordToggles === 'function') {
+                    resetPasswordToggles();
+                }
+                
+                // Run real-time validation for edit mode
+                setTimeout(() => {
+                    performRealTimeValidation();
+                }, 100);
+                
                 passwordModal.classList.remove('hidden');
             } catch (e) {
                 console.error(e);
@@ -280,10 +659,10 @@
 
         async function fetchTags() {
             try {
-                const response = await fetch(`${API_ORIGIN}/api/tags`);
+                const response = await fetch(API_ORIGIN + '/api/tags');
                 if (!response.ok) {
                     const errorText = await response.text();
-                    throw new Error(`Failed to fetch tags: ${response.status} ${response.statusText} - ${errorText}`);
+                    throw new Error('Failed to fetch tags: ' + response.status + ' ' + response.statusText + ' - ' + errorText);
                 }
                 allTags = await response.json() || [];
                 renderTags(allTags);
@@ -298,22 +677,46 @@
             passwords.forEach(p => {
                 const row = document.createElement('tr');
                 row.className = 'border-b border-gray-200 hover:bg-gray-100';
-                row.innerHTML = `
-                    <td class="py-3 px-6 text-left whitespace-nowrap">${p.site}</td>
-                    <td class="py-3 px-6 text-left">${p.username}</td>
-                    <td class="py-3 px-6 text-left">
-                        <div class="flex flex-wrap gap-1">
-                        ${p.tags.map(tag => `<span class="tag-item text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full last:mr-0 mr-1 break-all" style="background-color: ${tag.color}; color: #FFFFFF;">${tag.name}</span>`).join('')}
-                        </div>
-                    </td>
-                    <td class="py-3 px-6 text-center">
-                        <div class="flex item-center justify-center">
-                            <button class="edit-password-btn w-4 mr-2 transform hover:text-blue-500 hover:scale-110" data-id="${p.id}"><i class="fas fa-edit"></i></button>
-                            <button class="copy-password-btn w-4 mr-2 transform hover:text-green-500 hover:scale-110" data-id="${p.id}"><i class="fas fa-copy"></i></button>
-                            <button class="delete-password-btn w-4 mr-2 transform hover:text-red-500 hover:scale-110" data-id="${p.id}"><i class="fas fa-trash-alt"></i></button>
-                        </div>
-                    </td>
-                `;
+                
+                const tagsHTML = p.tags.map(tag => {
+                    const textColor = getTextColor(tag.color);
+                    const borderStyle = getBorderStyle(tag.color);
+                    return '<span class="tag-item text-xs font-semibold inline-block py-0.5 px-3 rounded border last:mr-0 mr-1 break-all" style="background-color: ' + tag.color + '; color: ' + textColor + '; border: ' + borderStyle + ';">' + tag.name + '</span>';
+                }).join('');
+                
+                // Password display area with show/hide and copy functionality
+                const passwordHTML = 
+                    '<div class="flex items-center gap-2">' +
+                        '<input type="password" id="password-' + p.id + '" class="password-display w-32 py-1 px-2 text-sm border rounded bg-gray-50" placeholder="••••••••" readonly>' +
+                        '<button class="show-password-btn w-4 transform hover:text-blue-500 hover:scale-110" data-id="' + p.id + '" title="Show/Hide password"><i class="fas fa-eye"></i></button>' +
+                        '<button class="copy-password-btn w-4 transform hover:text-green-500 hover:scale-110" data-id="' + p.id + '" title="Copy password to clipboard"><i class="fas fa-copy"></i></button>' +
+                    '</div>';
+                
+                // Notes display area with show/hide functionality
+                const notesHTML = p.notes && p.notes.trim() ? 
+                    '<div class="flex items-center gap-2">' +
+                        '<div class="notes-display w-40 max-h-16 overflow-hidden">' +
+                            '<div id="notes-' + p.id + '" class="text-sm text-gray-600 hidden">' + 
+                                '<div class="p-2 bg-gray-50 rounded border max-h-14 overflow-y-auto">' + (p.notes.length > 100 ? p.notes.substring(0, 100) + '...' : p.notes) + '</div>' +
+                            '</div>' +
+                            '<div class="text-sm text-gray-400">Click to view</div>' +
+                        '</div>' +
+                        '<button class="show-notes-btn w-4 transform hover:text-blue-500 hover:scale-110" data-id="' + p.id + '" title="Show/Hide notes"><i class="fas fa-eye"></i></button>' +
+                    '</div>' :
+                    '<span class="text-gray-400 text-sm">No notes</span>';
+                
+                row.innerHTML = 
+                    '<td class="py-3 px-6 text-left whitespace-nowrap">' + p.site + '</td>' +
+                    '<td class="py-3 px-6 text-left">' + p.username + '</td>' +
+                    '<td class="py-3 px-6 text-left">' + passwordHTML + '</td>' +
+                    '<td class="py-3 px-6 text-left">' + notesHTML + '</td>' +
+                    '<td class="py-3 px-6 text-left"><div class="flex flex-wrap gap-1">' + tagsHTML + '</div></td>' +
+                    '<td class="py-3 px-6 text-center">' +
+                        '<div class="flex item-center justify-center">' +
+                            '<button class="edit-password-btn w-4 mr-2 transform hover:text-blue-500 hover:scale-110" data-id="' + p.id + '" title="Edit password"><i class="fas fa-edit"></i></button>' +
+                            '<button class="delete-password-btn w-4 mr-2 transform hover:text-red-500 hover:scale-110" data-id="' + p.id + '" title="Delete password"><i class="fas fa-trash-alt"></i></button>' +
+                        '</div>' +
+                    '</td>';
                 passwordTableBody.appendChild(row);
             });
         }
@@ -322,24 +725,49 @@
             const tagListContainer = document.getElementById('tagList');
             if (!tagListContainer) return;
             tagListContainer.innerHTML = '';
-            tags.forEach(tag => {
+            
+            // Store all available tags for reference
+            window.allAvailableTags = tags;
+            
+            // Filter out tags that are already in the password tags area
+            const usedTagIds = Array.from(passwordTagsContainer.querySelectorAll('.tag-item')).map(tag => tag.dataset.id);
+            const availableTags = tags.filter(tag => !usedTagIds.includes(tag.id.toString()));
+            
+            availableTags.forEach(tag => {
                 const tagElement = document.createElement('span');
-                tagElement.className = 'tag-item text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full last:mr-0 mr-1 cursor-grab break-all';
+                tagElement.className = 'tag-item text-xs font-semibold inline-block py-0.5 px-3 rounded border last:mr-0 mr-1 cursor-pointer break-all';
                 tagElement.style.backgroundColor = tag.color;
-                tagElement.style.color = '#FFFFFF';
+                tagElement.style.color = getTextColor(tag.color);
+                tagElement.style.border = getBorderStyle(tag.color);
                 tagElement.dataset.id = tag.id;
                 tagElement.dataset.name = tag.name;
                 tagElement.dataset.color = tag.color;
                 tagElement.draggable = true;
-                tagElement.innerHTML = `${tag.name}`; // No edit/delete buttons on dashboard
+                tagElement.innerHTML = tag.name; // No edit/delete buttons on dashboard
+                
+                // Add click handler for mobile/touch devices
+                tagElement.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    addTagToPassword(tagElement);
+                });
+                
+                // Add touch event for better mobile support
+                tagElement.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    addTagToPassword(tagElement);
+                });
+                
                 tagListContainer.appendChild(tagElement);
             });
+            
+            // Sort the available tags
+            sortTagsInContainer(tagListContainer);
         }
         
         async function copyPassword(id) {
             // Need a new API endpoint to get password data and decrypt it
             try {
-                const response = await fetch(`${API_ORIGIN}/api/passwords?id=${id}&action=copy`);
+                const response = await fetch(API_ORIGIN + '/api/passwords?id=' + id + '&action=copy');
                 if (!response.ok) throw new Error('Failed to fetch password for copying.');
                 const password = await response.text();
                 // Copy to clipboard
@@ -353,6 +781,53 @@
             } catch (e) {
                 console.error(e);
                 alert(e.message);
+            }
+        }
+
+        async function showHidePassword(id) {
+            const passwordInput = document.getElementById('password-' + id);
+            const eyeIcon = document.querySelector('.show-password-btn[data-id="' + id + '"] i');
+            
+            if (passwordInput.type === 'password') {
+                // Show password - fetch and display
+                try {
+                    const response = await fetch(API_ORIGIN + '/api/passwords?id=' + id + '&action=copy');
+                    if (!response.ok) throw new Error('Failed to fetch password.');
+                    const password = await response.text();
+                    passwordInput.value = password;
+                    passwordInput.type = 'text';
+                    eyeIcon.classList.remove('fa-eye');
+                    eyeIcon.classList.add('fa-eye-slash');
+                } catch (e) {
+                    console.error(e);
+                    alert('Failed to fetch password: ' + e.message);
+                }
+            } else {
+                // Hide password
+                passwordInput.value = '';
+                passwordInput.type = 'password';
+                eyeIcon.classList.remove('fa-eye-slash');
+                eyeIcon.classList.add('fa-eye');
+            }
+        }
+
+        function showHideNotes(id) {
+            const notesDiv = document.getElementById('notes-' + id);
+            const placeholderDiv = notesDiv.parentElement.querySelector('.text-gray-400');
+            const eyeIcon = document.querySelector('.show-notes-btn[data-id="' + id + '"] i');
+            
+            if (notesDiv.classList.contains('hidden')) {
+                // Show notes
+                notesDiv.classList.remove('hidden');
+                placeholderDiv.style.display = 'none';
+                eyeIcon.classList.remove('fa-eye');
+                eyeIcon.classList.add('fa-eye-slash');
+            } else {
+                // Hide notes
+                notesDiv.classList.add('hidden');
+                placeholderDiv.style.display = 'block';
+                eyeIcon.classList.remove('fa-eye-slash');
+                eyeIcon.classList.add('fa-eye');
             }
         }
     });

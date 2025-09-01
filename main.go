@@ -4,6 +4,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -58,6 +59,7 @@ func main() {
 	mux.HandleFunc("/api/users", authMiddleware(usersAPIHandler))
 	mux.HandleFunc("/api/user/password", authMiddleware(changeMyPasswordHandler))
 	mux.HandleFunc("/api/passwords", authMiddleware(passwordsAPIHandler))
+	mux.HandleFunc("/api/passwords/check-duplicate", authMiddleware(checkPasswordDuplicateHandler))
 	mux.HandleFunc("/api/tags", authMiddleware(tagsAPIHandler))
 
 	// Import/Export routes
@@ -67,13 +69,17 @@ func main() {
 	mux.HandleFunc("/import/passwords", authMiddleware(importPasswordsHandler))
 
 	// Start the server
-	log.Println("Starting server on :8080")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Printf("Starting server on :%s", port)
 	log.Println("Security features enabled:")
 	log.Println("- Database-backed sessions")
 	log.Println("- Rate limiting on login attempts")
 	log.Println("- Security headers")
 	log.Println("- Session invalidation on password change")
-	if err := http.ListenAndServe(":8080", mux); err != nil {
+	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 }

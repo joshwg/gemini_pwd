@@ -29,7 +29,7 @@ func TestPasswordEntryJSON(t *testing.T) {
 		Username:  "user",
 		Password:  "secret", // This field is for decrypted data, not stored in DB
 		Notes:     "notes",
-		Tags:      []string{"a", "b"},
+		Tags:      []Tag{{ID: 1, Name: "a", Color: "#ff0000"}, {ID: 2, Name: "b", Color: "#00ff00"}},
 		CreatedAt: "2023-01-01",
 		Salt:      []byte("salty"),
 	}

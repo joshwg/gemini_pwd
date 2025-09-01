@@ -37,10 +37,11 @@
                     <div class="mb-4">
                         <label for="tagName" class="block text-gray-700 text-sm font-bold mb-2">Tag Name</label>
                         <input type="text" id="tagName" name="name" maxlength="40" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                        <div id="tagNameValidation" class="text-sm mt-1 hidden"></div>
                     </div>
                     <div class="mb-4">
                         <label for="tagDescription" class="block text-gray-700 text-sm font-bold mb-2">Description</label>
-                        <textarea id="tagDescription" name="description" maxlength="255" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
+                        <textarea id="tagDescription" name="description" maxlength="255" rows="4" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline resize-y"></textarea>
                     </div>
                     <div class="mb-4">
                         <label for="tagColor" class="block text-gray-700 text-sm font-bold mb-2">Color</label>
@@ -78,7 +79,7 @@
                         <div class="w-8 h-8 rounded-full border border-gray-300 cursor-pointer hover:border-gray-500" style="background-color: #525252" data-color="#525252"></div>
                     </div>
                     <div class="mt-4">
-                        <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Save</button>
+                        <button type="submit" id="tagSubmitBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Save</button>
                         <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
                     </div>
                 </form>
@@ -101,20 +102,96 @@
         const tagDescription = document.getElementById('tagDescription');
         const tagColor = document.getElementById('tagColor');
         const colorPalette = document.getElementById('colorPalette');
+        const tagSubmitBtn = document.getElementById('tagSubmitBtn');
+        const tagNameValidation = document.getElementById('tagNameValidation');
+
+        let allTags = []; // Store all tags for validation
+        let currentEditingTagId = null; // Track which tag we're editing
 
         fetchTags();
+
+        // Real-time validation for tag name
+        tagName.addEventListener('input', validateTagName);
+        tagName.addEventListener('blur', validateTagName);
+
+        function validateTagName() {
+            const name = tagName.value.trim();
+            const isEditing = tagID.value !== '';
+            let isValid = true;
+            let message = '';
+
+            // Reset styles
+            tagName.classList.remove('border-red-500', 'border-green-500');
+            tagNameValidation.classList.add('hidden');
+
+            if (name === '') {
+                isValid = false;
+                message = 'Tag name is required';
+                tagName.classList.add('border-red-500');
+                tagNameValidation.classList.remove('hidden');
+                tagNameValidation.classList.remove('text-green-600');
+                tagNameValidation.classList.add('text-red-600');
+                tagNameValidation.textContent = message;
+            } else {
+                // Check for duplicates
+                const isDuplicate = allTags.some(tag => {
+                    const isSameName = tag.name.toLowerCase() === name.toLowerCase();
+                    const isDifferentTag = isEditing ? tag.id.toString() !== tagID.value : true;
+                    return isSameName && isDifferentTag;
+                });
+
+                if (isDuplicate) {
+                    isValid = false;
+                    message = 'A tag with this name already exists';
+                    tagName.classList.add('border-red-500');
+                    tagNameValidation.classList.remove('hidden');
+                    tagNameValidation.classList.remove('text-green-600');
+                    tagNameValidation.classList.add('text-red-600');
+                    tagNameValidation.textContent = message;
+                } else if (name.length > 0) {
+                    // Valid name
+                    tagName.classList.add('border-green-500');
+                    tagNameValidation.classList.remove('hidden');
+                    tagNameValidation.classList.remove('text-red-600');
+                    tagNameValidation.classList.add('text-green-600');
+                    tagNameValidation.textContent = '✓ Valid tag name';
+                }
+            }
+
+            // Enable/disable submit button
+            tagSubmitBtn.disabled = !isValid;
+            if (isValid) {
+                tagSubmitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                tagSubmitBtn.classList.add('hover:bg-blue-700');
+            } else {
+                tagSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                tagSubmitBtn.classList.remove('hover:bg-blue-700');
+            }
+        }
 
         createTagBtn.addEventListener('click', () => {
             tagModalTitle.textContent = 'Create New Tag';
             tagForm.reset();
             tagID.value = '';
             tagModal.classList.remove('hidden');
+            // Reset validation state
+            tagName.classList.remove('border-red-500', 'border-green-500');
+            tagNameValidation.classList.add('hidden');
+            tagSubmitBtn.disabled = true;
+            tagSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            tagSubmitBtn.classList.remove('hover:bg-blue-700');
         });
 
         tagForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // Don't submit if validation fails
+            if (tagSubmitBtn.disabled) {
+                return;
+            }
+            
             const data = {
-                name: tagName.value,
+                name: tagName.value.trim(),
                 description: tagDescription.value,
                 color: tagColor.value
             };
@@ -122,20 +199,25 @@
             const method = tagID.value ? 'PUT' : 'POST';
             const url = tagID.value ? `${API_ORIGIN}/api/tags?id=${tagID.value}` : `${API_ORIGIN}/api/tags`;
 
-            const response = await fetch(url, {
-                method: method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
 
-            if (response.ok) {
-                console.log('Tag saved successfully!');
-                tagModal.classList.add('hidden');
-                fetchTags();
-            } else {
-                console.error('Failed to save tag.');
-                const errorText = await response.text();
-                alert('Error: ' + errorText);
+                if (response.ok) {
+                    console.log('Tag saved successfully!');
+                    tagModal.classList.add('hidden');
+                    await fetchTags(); // Refresh tags list for validation
+                } else {
+                    console.error('Failed to save tag.');
+                    const errorText = await response.text();
+                    alert('Error: ' + errorText);
+                }
+            } catch (error) {
+                console.error('Error saving tag:', error);
+                alert('An error occurred while saving the tag.');
             }
         });
 
@@ -158,8 +240,28 @@
         
         document.querySelectorAll('.close-modal').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                e.target.closest('.fixed').classList.add('hidden');
+                const modal = e.target.closest('.fixed');
+                modal.classList.add('hidden');
+                // Reset validation state when closing modal
+                tagName.classList.remove('border-red-500', 'border-green-500');
+                tagNameValidation.classList.add('hidden');
+                tagSubmitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                tagSubmitBtn.classList.add('hover:bg-blue-700');
+                tagSubmitBtn.disabled = false;
             });
+        });
+
+        // Close modal when clicking outside
+        tagModal.addEventListener('click', (e) => {
+            if (e.target === tagModal) {
+                tagModal.classList.add('hidden');
+                // Reset validation state when closing modal
+                tagName.classList.remove('border-red-500', 'border-green-500');
+                tagNameValidation.classList.add('hidden');
+                tagSubmitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                tagSubmitBtn.classList.add('hover:bg-blue-700');
+                tagSubmitBtn.disabled = false;
+            }
         });
 
         colorPalette.addEventListener('click', (e) => {
@@ -173,6 +275,7 @@
                 const response = await fetch(`${API_ORIGIN}/api/tags`);
                 if (!response.ok) throw new Error('Failed to fetch tags.');
                 const tags = await response.json();
+                allTags = tags; // Store tags for validation
                 renderTags(tags);
             } catch (e) {
                 console.error(e);
@@ -191,6 +294,8 @@
                 tagDescription.value = tag.description;
                 tagColor.value = tag.color;
                 tagModal.classList.remove('hidden');
+                // Trigger validation for the current name
+                validateTagName();
             } catch (e) {
                 console.error(e);
                 alert(e.message);

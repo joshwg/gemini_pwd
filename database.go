@@ -17,10 +17,15 @@ var db *sql.DB
 // initDB initializes the database connection and creates tables if they don't exist.
 func initDB(filepath string) {
 	var err error
-	db, err = sql.Open("sqlite3", filepath+"?_foreign_keys=on")
+	db, err = sql.Open("sqlite3", filepath+"?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=10000")
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Set connection pool settings to reduce contention
+	db.SetMaxOpenConns(1)    // SQLite can only handle one writer at a time
+	db.SetMaxIdleConns(1)    // Keep one connection alive
+	db.SetConnMaxLifetime(0) // No connection lifetime limit
 
 	createTables := `
 	CREATE TABLE IF NOT EXISTS users (
@@ -47,6 +52,7 @@ func initDB(filepath string) {
 		notes_encrypted BLOB,
 		salt BLOB NOT NULL,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
 	CREATE TABLE IF NOT EXISTS entry_tags (
@@ -79,6 +85,24 @@ func initDB(filepath string) {
 		log.Fatalf("Failed to create tables: %v", err)
 	}
 
+	// Apply database migrations
+	applyMigrations()
+
+	// Set additional SQLite pragmas for better concurrency
+	pragmas := []string{
+		"PRAGMA synchronous = NORMAL",  // Faster than FULL, still safe with WAL
+		"PRAGMA cache_size = 10000",    // Increase cache size
+		"PRAGMA temp_store = memory",   // Store temp tables in memory
+		"PRAGMA mmap_size = 268435456", // Use memory mapping (256MB)
+	}
+
+	for _, pragma := range pragmas {
+		_, err = db.Exec(pragma)
+		if err != nil {
+			log.Printf("Warning: Failed to set pragma %s: %v", pragma, err)
+		}
+	}
+
 	// Check if the super user exists
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM users WHERE username = 'super'").Scan(&count)
@@ -97,5 +121,31 @@ func initDB(filepath string) {
 			log.Fatalf("Failed to create super user: %v", err)
 		}
 		fmt.Println("'super' user created with password 'abcd1234'. Please change it immediately.")
+	}
+}
+
+// applyMigrations handles database schema migrations
+func applyMigrations() {
+	// Migration 1: Add modified_at column to password_entries if it doesn't exist
+	var columnExists int
+	err := db.QueryRow(`
+		SELECT COUNT(*) FROM pragma_table_info('password_entries') 
+		WHERE name = 'modified_at'
+	`).Scan(&columnExists)
+
+	if err != nil {
+		log.Printf("Warning: Failed to check for modified_at column: %v", err)
+	} else if columnExists == 0 {
+		_, err = db.Exec("ALTER TABLE password_entries ADD COLUMN modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+		if err != nil {
+			log.Printf("Warning: Failed to add modified_at column: %v", err)
+		} else {
+			log.Println("Applied migration: Added modified_at column to password_entries")
+			// Update existing entries to set modified_at = created_at
+			_, err = db.Exec("UPDATE password_entries SET modified_at = created_at WHERE modified_at IS NULL")
+			if err != nil {
+				log.Printf("Warning: Failed to update existing modified_at values: %v", err)
+			}
+		}
 	}
 }

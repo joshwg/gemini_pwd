@@ -2,12 +2,13 @@
 package main
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"fmt"
-	"golang.org/x/crypto/bcrypt"
-	"math/rand"
+	"strconv"
 	"strings"
-	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // The User, PasswordEntry, and Tag structs are assumed to be in models.go
@@ -41,7 +42,7 @@ func createUser(admin *User, newUsername, newPassword string, makeAdmin, skipAdm
 	if !skipAdminCheck && (admin == nil || !admin.IsAdmin) {
 		return fmt.Errorf("permission denied: only administrators can create users")
 	}
-	
+
 	// Check for existing user case-insensitively
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM users WHERE username = ? COLLATE NOCASE", newUsername).Scan(&count)
@@ -84,9 +85,9 @@ func deleteUser(admin *User, usernameToDelete string) error {
 
 // renameUser (Admin only)
 func renameUser(admin *User, userID int, oldUsername, newUsername string) error {
-    if admin == nil || !admin.IsAdmin {
-        return fmt.Errorf("permission denied: only administrators can rename users")
-    }
+	if admin == nil || !admin.IsAdmin {
+		return fmt.Errorf("permission denied: only administrators can rename users")
+	}
 
 	// Check for new username case-insensitively, excluding the current user by ID.
 	var count int
@@ -98,11 +99,11 @@ func renameUser(admin *User, userID int, oldUsername, newUsername string) error 
 		return fmt.Errorf("new username already exists")
 	}
 
-    _, err = db.Exec("UPDATE users SET username = ? WHERE id = ?", newUsername, userID)
-    if err != nil {
-        return fmt.Errorf("failed to rename user: %w", err)
-    }
-    return nil
+	_, err = db.Exec("UPDATE users SET username = ? WHERE id = ?", newUsername, userID)
+	if err != nil {
+		return fmt.Errorf("failed to rename user: %w", err)
+	}
+	return nil
 }
 
 // changeAdminStatus (Admin only)
@@ -165,31 +166,31 @@ func changePassword(currentUser *User, targetUsername, currentPassword, newPassw
 
 // getUserByID retrieves a user by their ID.
 func getUserByID(id int) (*User, error) {
-    var u User
-    err := db.QueryRow("SELECT id, username, is_admin FROM users WHERE id = ?", id).Scan(&u.ID, &u.Username, &u.IsAdmin)
-    if err != nil {
-        return nil, err
-    }
-    return &u, nil
+	var u User
+	err := db.QueryRow("SELECT id, username, is_admin FROM users WHERE id = ?", id).Scan(&u.ID, &u.Username, &u.IsAdmin)
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
 }
 
 // getAllUsers retrieves a list of all users from the database.
 func getAllUsers() ([]User, error) {
-    rows, err := db.Query("SELECT id, username, is_admin FROM users ORDER BY username ASC")
-    if err != nil {
-        return nil, fmt.Errorf("failed to query users: %w", err)
-    }
-    defer rows.Close()
+	rows, err := db.Query("SELECT id, username, is_admin FROM users ORDER BY username ASC")
+	if err != nil {
+		return nil, fmt.Errorf("failed to query users: %w", err)
+	}
+	defer rows.Close()
 
-    var users []User
-    for rows.Next() {
-        var user User
-        if err := rows.Scan(&user.ID, &user.Username, &user.IsAdmin); err != nil {
-            return nil, fmt.Errorf("failed to scan user row: %w", err)
-        }
-        users = append(users, user)
-    }
-    return users, nil
+	var users []User
+	for rows.Next() {
+		var user User
+		if err := rows.Scan(&user.ID, &user.Username, &user.IsAdmin); err != nil {
+			return nil, fmt.Errorf("failed to scan user row: %w", err)
+		}
+		users = append(users, user)
+	}
+	return users, nil
 }
 
 // getTags retrieves a list of all tags for a user.
@@ -248,6 +249,31 @@ func createTag(userID int, name, description, color string) error {
 	return nil
 }
 
+// createOrUpdateTag creates a new tag or updates an existing one (for imports)
+func createOrUpdateTag(userID int, name, description, color string) error {
+	// Check if tag exists
+	var existingID int
+	err := db.QueryRow("SELECT id FROM tags WHERE user_id = ? AND name = ? COLLATE NOCASE", userID, name).Scan(&existingID)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("failed to check for existing tag: %w", err)
+	}
+
+	if err == sql.ErrNoRows {
+		// Tag doesn't exist, create it
+		_, err = db.Exec("INSERT INTO tags (user_id, name, description, color) VALUES (?, ?, ?, ?)", userID, name, description, color)
+		if err != nil {
+			return fmt.Errorf("failed to create tag: %w", err)
+		}
+	} else {
+		// Tag exists, update it
+		_, err = db.Exec("UPDATE tags SET description = ?, color = ? WHERE id = ?", description, color, existingID)
+		if err != nil {
+			return fmt.Errorf("failed to update tag: %w", err)
+		}
+	}
+	return nil
+}
+
 // updateTag updates an existing tag's name, description, and color.
 func updateTag(userID int, tagID int, newName, newDescription, newColor string) error {
 	// Check for existing tag case-insensitively, excluding the current tag.
@@ -281,13 +307,17 @@ func deleteTag(userID int, tagID int) error {
 }
 
 // getPasswords retrieves a list of all passwords for a user, with optional filtering.
+// Returns only metadata (no sensitive data) for client-side display.
 func getPasswords(userID int, query string) ([]PasswordEntry, error) {
 	var rows *sql.Rows
 	var err error
 
 	sqlQuery := `
 		SELECT
-			pe.id, pe.site, pe.username, pe.password_encrypted, pe.notes_encrypted, pe.created_at, GROUP_CONCAT(t.name) as tagNames, GROUP_CONCAT(t.color) as tagColors
+			pe.id, pe.site, pe.username, pe.created_at, pe.modified_at,
+			GROUP_CONCAT(t.id) as tagIDs,
+			GROUP_CONCAT(t.name) as tagNames, 
+			GROUP_CONCAT(t.color) as tagColors
 		FROM
 			password_entries pe
 		LEFT JOIN
@@ -311,8 +341,9 @@ func getPasswords(userID int, query string) ([]PasswordEntry, error) {
 			pe.id
 		ORDER BY
 			pe.site ASC
+		LIMIT 100
 	`
-	
+
 	if query != "" {
 		searchQuery := "%" + query + "%"
 		rows, err = db.Query(sqlQuery, userID, searchQuery, searchQuery, searchQuery)
@@ -328,30 +359,148 @@ func getPasswords(userID int, query string) ([]PasswordEntry, error) {
 	var passwords []PasswordEntry
 	for rows.Next() {
 		var p PasswordEntry
-		var tagNames, tagColors sql.NullString
-		var encryptedPassword, encryptedNotes []byte
-		if err := rows.Scan(&p.ID, &p.Site, &p.Username, &encryptedPassword, &encryptedNotes, &p.CreatedAt, &tagNames, &tagColors); err != nil {
+		var tagIDs, tagNames, tagColors sql.NullString
+		// Only scan non-sensitive data for client display
+		if err := rows.Scan(&p.ID, &p.Site, &p.Username, &p.CreatedAt, &p.ModifiedAt, &tagIDs, &tagNames, &tagColors); err != nil {
 			return nil, fmt.Errorf("failed to scan password row: %w", err)
 		}
-		
-		if tagNames.Valid {
-			p.Tags = strings.Split(tagNames.String, ",")
+
+		// Parse tags into proper Tag objects
+		if tagNames.Valid && tagIDs.Valid && tagColors.Valid {
+			tagIDStrings := strings.Split(tagIDs.String, ",")
+			tagNameStrings := strings.Split(tagNames.String, ",")
+			tagColorStrings := strings.Split(tagColors.String, ",")
+
+			p.Tags = make([]Tag, 0, len(tagNameStrings))
+			for i, name := range tagNameStrings {
+				if i < len(tagIDStrings) && i < len(tagColorStrings) {
+					if id, err := strconv.Atoi(tagIDStrings[i]); err == nil {
+						p.Tags = append(p.Tags, Tag{
+							ID:    id,
+							Name:  name,
+							Color: tagColorStrings[i],
+						})
+					}
+				}
+			}
 		} else {
-			p.Tags = []string{}
+			p.Tags = []Tag{}
 		}
+
+		// Set empty strings for sensitive data - they should not be sent to client
+		p.Password = ""
+		p.Notes = ""
 
 		passwords = append(passwords, p)
 	}
-	
+
 	if passwords == nil {
 		return []PasswordEntry{}, nil
 	}
-	
+
 	return passwords, nil
+}
+
+// getPasswordByIDDecrypted retrieves and decrypts a single password by ID
+func getPasswordByIDDecrypted(id int, globalKey []byte) (*PasswordEntry, error) {
+	var p PasswordEntry
+	var passwordEncrypted, notesEncrypted, salt []byte
+
+	query := `SELECT id, site, username, password_encrypted, notes_encrypted, salt, created_at, tags FROM passwords WHERE id = ?`
+	err := db.QueryRow(query, id).Scan(&p.ID, &p.Site, &p.Username, &passwordEncrypted, &notesEncrypted, &salt, &p.CreatedAt, &p.Tags)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decrypt password
+	if len(passwordEncrypted) > 0 {
+		decryptedPassword, err := decrypt(passwordEncrypted, salt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt password: %w", err)
+		}
+		p.Password = string(decryptedPassword)
+	}
+
+	// Decrypt notes
+	if len(notesEncrypted) > 0 {
+		decryptedNotes, err := decrypt(notesEncrypted, salt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt notes: %w", err)
+		}
+		p.Notes = string(decryptedNotes)
+	}
+
+	return &p, nil
+}
+
+// getDecryptedPassword retrieves and decrypts only the password field for a specific user and password ID
+func getDecryptedPassword(userID, passwordID int) (string, error) {
+	var passwordEncrypted, salt []byte
+
+	err := db.QueryRow(`
+		SELECT password_encrypted, salt 
+		FROM password_entries 
+		WHERE id = ? AND user_id = ?`,
+		passwordID, userID).Scan(&passwordEncrypted, &salt)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", fmt.Errorf("password not found or access denied")
+		}
+		return "", fmt.Errorf("failed to query password: %w", err)
+	}
+
+	if len(passwordEncrypted) > 0 {
+		decryptedPassword, err := decrypt(passwordEncrypted, salt)
+		if err != nil {
+			return "", fmt.Errorf("failed to decrypt password: %w", err)
+		}
+		return string(decryptedPassword), nil
+	}
+
+	return "", nil
+}
+
+// getDecryptedNotes retrieves and decrypts only the notes field for a specific user and password ID
+func getDecryptedNotes(userID, passwordID int) (string, error) {
+	var notesEncrypted, salt []byte
+
+	err := db.QueryRow(`
+		SELECT notes_encrypted, salt 
+		FROM password_entries 
+		WHERE id = ? AND user_id = ?`,
+		passwordID, userID).Scan(&notesEncrypted, &salt)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", fmt.Errorf("password not found or access denied")
+		}
+		return "", fmt.Errorf("failed to query notes: %w", err)
+	}
+
+	if len(notesEncrypted) > 0 {
+		decryptedNotes, err := decrypt(notesEncrypted, salt)
+		if err != nil {
+			return "", fmt.Errorf("failed to decrypt notes: %w", err)
+		}
+		return string(decryptedNotes), nil
+	}
+
+	return "", nil
 }
 
 // createPasswordEntry creates a new password entry.
 func createPasswordEntry(userID int, site, username, password, notes string, tagNames []string) error {
+	// Check for existing password entry (unique by site and username)
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM password_entries WHERE user_id = ? AND site = ? AND username = ? COLLATE NOCASE", userID, site, username).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check for existing password entry: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("password entry for site '%s' and username '%s' already exists", site, username)
+	}
+
 	// Generate a unique salt for this entry
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
@@ -375,11 +524,11 @@ func createPasswordEntry(userID int, site, username, password, notes string, tag
 	}
 	defer tx.Rollback()
 
-	res, err := tx.Exec("INSERT INTO password_entries (user_id, site, username, password_encrypted, notes_encrypted, salt, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)", userID, site, username, encryptedPassword, encryptedNotes, salt)
+	res, err := tx.Exec("INSERT INTO password_entries (user_id, site, username, password_encrypted, notes_encrypted, salt, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", userID, site, username, encryptedPassword, encryptedNotes, salt)
 	if err != nil {
 		return fmt.Errorf("failed to insert password entry: %w", err)
 	}
-	
+
 	lastID, err := res.LastInsertId()
 	if err != nil {
 		return fmt.Errorf("failed to get last insert id: %w", err)
@@ -387,12 +536,16 @@ func createPasswordEntry(userID int, site, username, password, notes string, tag
 
 	// Add tags to the new password entry
 	for _, tagName := range tagNames {
+		if tagName == "" {
+			continue // Skip empty tag names
+		}
+
 		var tagID int64
 		err := tx.QueryRow("SELECT id FROM tags WHERE user_id = ? AND name = ? COLLATE NOCASE", userID, tagName).Scan(&tagID)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				// Create the tag if it doesn't exist
-				res, err := tx.Exec("INSERT INTO tags (user_id, name) VALUES (?, ?)", userID, tagName)
+				// Create the tag if it doesn't exist with empty description
+				res, err := tx.Exec("INSERT INTO tags (user_id, name, description, color) VALUES (?, ?, '', '')", userID, tagName)
 				if err != nil {
 					return fmt.Errorf("failed to create tag: %w", err)
 				}
@@ -411,7 +564,94 @@ func createPasswordEntry(userID int, site, username, password, notes string, tag
 			return fmt.Errorf("failed to link password and tag: %w", err)
 		}
 	}
-	
+
+	return tx.Commit()
+}
+
+// createOrUpdatePasswordEntry creates a new password entry or updates an existing one (for imports)
+func createOrUpdatePasswordEntry(userID int, site, username, password, notes string, tagNames []string) error {
+	// Check if password entry exists (unique by site and username)
+	var existingID int
+	err := db.QueryRow("SELECT id FROM password_entries WHERE user_id = ? AND site = ? AND username = ? COLLATE NOCASE", userID, site, username).Scan(&existingID)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("failed to check for existing password entry: %w", err)
+	}
+
+	if err == sql.ErrNoRows {
+		// Entry doesn't exist, create it
+		return createPasswordEntryWithTags(userID, site, username, password, notes, tagNames)
+	} else {
+		// Entry exists, update it
+		return updatePasswordEntry(userID, existingID, site, username, password, notes, tagNames)
+	}
+}
+
+// createPasswordEntryWithTags creates a password entry and handles tag creation
+func createPasswordEntryWithTags(userID int, site, username, password, notes string, tagNames []string) error {
+	// Generate a unique salt for this entry
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		return fmt.Errorf("failed to generate salt: %w", err)
+	}
+
+	// First, encrypt the sensitive data using the new salt
+	encryptedPassword, err := encrypt([]byte(password), salt)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt password: %w", err)
+	}
+
+	encryptedNotes, err := encrypt([]byte(notes), salt)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt notes: %w", err)
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec("INSERT INTO password_entries (user_id, site, username, password_encrypted, notes_encrypted, salt, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", userID, site, username, encryptedPassword, encryptedNotes, salt)
+	if err != nil {
+		return fmt.Errorf("failed to insert password entry: %w", err)
+	}
+
+	lastID, err := res.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("failed to get last insert id: %w", err)
+	}
+
+	// Add tags to the new password entry
+	for _, tagName := range tagNames {
+		if tagName == "" {
+			continue // Skip empty tag names
+		}
+
+		var tagID int64
+		err := tx.QueryRow("SELECT id FROM tags WHERE user_id = ? AND name = ? COLLATE NOCASE", userID, tagName).Scan(&tagID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				// Create the tag if it doesn't exist with empty description
+				res, err := tx.Exec("INSERT INTO tags (user_id, name, description, color) VALUES (?, ?, '', '')", userID, tagName)
+				if err != nil {
+					return fmt.Errorf("failed to create tag: %w", err)
+				}
+				tagID, err = res.LastInsertId()
+				if err != nil {
+					return fmt.Errorf("failed to get new tag id: %w", err)
+				}
+			} else {
+				return fmt.Errorf("failed to query tag: %w", err)
+			}
+		}
+
+		// Link the password and tag
+		_, err = tx.Exec("INSERT INTO entry_tags (entry_id, tag_id) VALUES (?, ?)", lastID, tagID)
+		if err != nil {
+			return fmt.Errorf("failed to link password and tag: %w", err)
+		}
+	}
+
 	return tx.Commit()
 }
 
@@ -439,7 +679,7 @@ func updatePasswordEntry(userID, id int, site, username, password, notes string,
 	if err != nil {
 		return fmt.Errorf("failed to encrypt notes: %w", err)
 	}
-	_, err = tx.Exec("UPDATE password_entries SET site = ?, username = ?, password_encrypted = ?, notes_encrypted = ? WHERE id = ? AND user_id = ?", site, username, encryptedPassword, encryptedNotes, id, userID)
+	_, err = tx.Exec("UPDATE password_entries SET site = ?, username = ?, password_encrypted = ?, notes_encrypted = ?, modified_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?", site, username, encryptedPassword, encryptedNotes, id, userID)
 	if err != nil {
 		return fmt.Errorf("failed to update password entry: %w", err)
 	}
@@ -457,7 +697,7 @@ func updatePasswordEntry(userID, id int, site, username, password, notes string,
 		if err != nil {
 			if err == sql.ErrNoRows {
 				// Create the tag if it doesn't exist
-				res, err := tx.Exec("INSERT INTO tags (user_id, name) VALUES (?, ?)", userID, tagName)
+				res, err := tx.Exec("INSERT INTO tags (user_id, name, description, color) VALUES (?, ?, '', '')", userID, tagName)
 				if err != nil {
 					return fmt.Errorf("failed to create tag: %w", err)
 				}
@@ -539,9 +779,14 @@ func getAllDecryptedPasswords(userID int) ([]PasswordEntry, error) {
 		}
 
 		if tagNames.Valid {
-			p.Tags = strings.Split(tagNames.String, ",")
+			// For export, we return tag names as a slice of strings
+			tagNameStrings := strings.Split(tagNames.String, ",")
+			p.Tags = make([]Tag, 0, len(tagNameStrings))
+			for _, name := range tagNameStrings {
+				p.Tags = append(p.Tags, Tag{Name: name})
+			}
 		} else {
-			p.Tags = []string{}
+			p.Tags = []Tag{}
 		}
 
 		passwords = append(passwords, p)
@@ -558,11 +803,14 @@ func getAllDecryptedPasswords(userID int) ([]PasswordEntry, error) {
 func getPasswordByID(userID, id int) (*PasswordEntry, error) {
 	var p PasswordEntry
 	var encryptedPassword, encryptedNotes, salt []byte
-	var tagNames, tagColors sql.NullString
+	var tagIDs, tagNames, tagColors sql.NullString
 
 	sqlQuery := `
 		SELECT
-			pe.id, pe.site, pe.username, pe.password_encrypted, pe.notes_encrypted, pe.salt, pe.created_at, GROUP_CONCAT(t.name) as tagNames, GROUP_CONCAT(t.color) as tagColors
+			pe.id, pe.site, pe.username, pe.password_encrypted, pe.notes_encrypted, pe.salt, pe.created_at, pe.modified_at,
+			GROUP_CONCAT(t.id) as tagIDs,
+			GROUP_CONCAT(t.name) as tagNames, 
+			GROUP_CONCAT(t.color) as tagColors
 		FROM
 			password_entries pe
 		LEFT JOIN
@@ -574,15 +822,31 @@ func getPasswordByID(userID, id int) (*PasswordEntry, error) {
 		GROUP BY
 			pe.id
 	`
-	err := db.QueryRow(sqlQuery, userID, id).Scan(&p.ID, &p.Site, &p.Username, &encryptedPassword, &encryptedNotes, &salt, &p.CreatedAt, &tagNames, &tagColors)
+	err := db.QueryRow(sqlQuery, userID, id).Scan(&p.ID, &p.Site, &p.Username, &encryptedPassword, &encryptedNotes, &salt, &p.CreatedAt, &p.ModifiedAt, &tagIDs, &tagNames, &tagColors)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve password: %w", err)
 	}
 
-	if tagNames.Valid {
-		p.Tags = strings.Split(tagNames.String, ",")
+	// Parse tags into proper Tag objects
+	if tagNames.Valid && tagIDs.Valid && tagColors.Valid {
+		tagIDStrings := strings.Split(tagIDs.String, ",")
+		tagNameStrings := strings.Split(tagNames.String, ",")
+		tagColorStrings := strings.Split(tagColors.String, ",")
+
+		p.Tags = make([]Tag, 0, len(tagNameStrings))
+		for i, name := range tagNameStrings {
+			if i < len(tagIDStrings) && i < len(tagColorStrings) {
+				if tagID, err := strconv.Atoi(tagIDStrings[i]); err == nil {
+					p.Tags = append(p.Tags, Tag{
+						ID:    tagID,
+						Name:  name,
+						Color: tagColorStrings[i],
+					})
+				}
+			}
+		}
 	} else {
-		p.Tags = []string{}
+		p.Tags = []Tag{}
 	}
 
 	// Decrypt the password and notes
@@ -599,8 +863,4 @@ func getPasswordByID(userID, id int) (*PasswordEntry, error) {
 	p.Notes = string(decryptedNotes)
 
 	return &p, nil
-}
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
 }

@@ -218,12 +218,37 @@ func validateSession(sessionToken string) (*User, error) {
 		return nil, err
 	}
 
-	// Refresh session expiration (sliding window)
+	// Refresh session expiration (sliding window) with timeout
 	newExpiresAt := time.Now().Add(30 * time.Minute)
-	_, err = db.Exec("UPDATE sessions SET expires_at = ? WHERE id = ?", newExpiresAt, sessionToken)
-	if err != nil {
-		log.Printf("Error updating session expiration: %v", err)
-	}
+
+	// Use a background goroutine to avoid blocking the request
+	go func() {
+		// Add a timeout to prevent hanging
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		// Retry logic for database locks
+		maxRetries := 3
+		for i := 0; i < maxRetries; i++ {
+			_, err = db.ExecContext(ctx, "UPDATE sessions SET expires_at = ? WHERE id = ?", newExpiresAt, sessionToken)
+			if err == nil {
+				return // Success
+			}
+
+			// Check if it's a database lock error
+			if strings.Contains(err.Error(), "database is locked") && i < maxRetries-1 {
+				// Wait a bit before retrying
+				time.Sleep(time.Duration(100*(i+1)) * time.Millisecond)
+				continue
+			}
+
+			// For other errors or final retry, log the error
+			log.Printf("Error updating session expiration (attempt %d/%d): %v", i+1, maxRetries, err)
+			if i == maxRetries-1 {
+				log.Printf("Failed to update session expiration after %d attempts", maxRetries)
+			}
+		}
+	}()
 
 	// Get user details
 	user, err := getUserByID(userID)
@@ -259,14 +284,24 @@ func securityHeaders(next http.HandlerFunc) http.HandlerFunc {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; script-src 'self' https://cdn.jsdelivr.net; font-src 'self' https://cdnjs.cloudflare.com")
+
+		// Updated CSP to allow required CDNs and inline styles/scripts
+		// Note: 'unsafe-eval' and 'unsafe-inline' are required for our inline scripts and reduce security
+		// For production, consider extracting scripts to separate files or using nonces/hashes
+		csp := "default-src 'self'; " +
+			"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.tailwindcss.com; " +
+			"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.tailwindcss.com; " +
+			"font-src 'self' https://cdnjs.cloudflare.com; " +
+			"img-src 'self' data:; " +
+			"connect-src 'self'; " +
+			"object-src 'none'; " +
+			"base-uri 'self'"
+		w.Header().Set("Content-Security-Policy", csp)
 
 		// Call the next handler
 		next.ServeHTTP(w, r)
 	}
-}
-
-// authMiddleware protects routes that require authentication using database sessions
+} // authMiddleware protects routes that require authentication using database sessions
 func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return securityHeaders(func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie("session_token")

@@ -34,10 +34,10 @@ func TestCreateSessionAndGetUserFromSession(t *testing.T) {
 
 	// Add the cookie to the request and test session retrieval
 	req.AddCookie(sessionCookie)
-	
+
 	// We need to simulate the authMiddleware to get the user in the context
 	handler := authMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		retrievedUser, ok := r.Context().Value("user").(*User)
+		retrievedUser, ok := r.Context().Value(userContextKey).(*User)
 		if !ok {
 			t.Fatal("User not found in context")
 		}
@@ -45,27 +45,34 @@ func TestCreateSessionAndGetUserFromSession(t *testing.T) {
 			t.Errorf("Retrieved user does not match original user. Got %+v, want %+v", retrievedUser, user)
 		}
 	})
-	
+
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 }
 
 // TestSessionExpiration tests that sessions expire correctly.
 func TestSessionExpiration(t *testing.T) {
+	// Ensure schema exists for this test
+	if err := createSchema(); err != nil {
+		t.Fatalf("Failed to create schema for session test: %v", err)
+	}
+
 	// Setup: Clean database and create a user
+	db.Exec("DELETE FROM sessions")
 	db.Exec("DELETE FROM users")
 	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'testuser', 'hash', 0)")
-	user := &User{ID: 1, Username: "testuser", IsAdmin: false}
 
-	// Create a session that is already expired
+	// Create an expired session directly in the database
 	expiredTime := time.Now().Add(-2 * time.Hour)
-	sessions["expired_token"] = session{
-		userID:  user.ID,
-		expires: expiredTime,
+	expiredToken := "expired_token_123"
+	_, err := db.Exec("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)",
+		expiredToken, 1, expiredTime)
+	if err != nil {
+		t.Fatalf("Failed to create expired session: %v", err)
 	}
 
 	// Create a request with the expired session token
 	req, _ := http.NewRequest("GET", "/", nil)
-	req.AddCookie(&http.Cookie{Name: "session_token", Value: "expired_token"})
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: expiredToken})
 
 	// We expect the middleware to redirect to the login page
 	rr := httptest.NewRecorder()

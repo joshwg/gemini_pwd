@@ -28,8 +28,8 @@
                         <a href="#" id="importTagsBtn" class="block px-4 py-2 text-sm hover:bg-gray-100">Import Tags</a>
                         <a href="#" id="importPasswordsBtn" class="block px-4 py-2 text-sm hover:bg-gray-100">Import Passwords</a>
                         <hr>
-                        <a href="/export/tags" class="block px-4 py-2 text-sm hover:bg-gray-100">Export Tags</a>
-                        <a href="/export/passwords" class="block px-4 py-2 text-sm hover:bg-gray-100">Export Passwords</a>
+                        <a href="#" id="exportTagsBtn" class="block px-4 py-2 text-sm hover:bg-gray-100">Export Tags</a>
+                        <a href="#" id="exportPasswordsBtn" class="block px-4 py-2 text-sm hover:bg-gray-100">Export Passwords</a>
                         <a href="#" id="changeMyPasswordBtn" class="block px-4 py-2 text-sm hover:bg-gray-100">Change Password</a>
                         <hr>
                         <a href="/logout" class="block px-4 py-2 text-sm hover:bg-red-100 text-red-700">Logout</a>
@@ -58,6 +58,7 @@
                             <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="currentPassword">
                                 <i class="fas fa-eye"></i>
                             </span>
+                            <div id="currentPasswordValidation" class="text-sm mt-1 hidden"></div>
                         </div>
                         <div class="relative mb-4">
                             <label for="newPassword" class="block text-gray-700 text-sm font-bold mb-2 text-left">New Password</label>
@@ -65,6 +66,7 @@
                             <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="newPassword">
                                 <i class="fas fa-eye"></i>
                             </span>
+                            <div id="newPasswordValidation" class="text-sm mt-1 hidden"></div>
                         </div>
                         <div class="relative mb-6">
                             <label for="confirmNewPassword" class="block text-gray-700 text-sm font-bold mb-2 text-left">Confirm New Password</label>
@@ -72,9 +74,10 @@
                             <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="confirmNewPassword">
                                 <i class="fas fa-eye"></i>
                             </span>
+                            <div id="confirmNewPasswordValidation" class="text-sm mt-1 hidden"></div>
                         </div>
                         <div class="mt-4">
-                            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Change Password</button>
+                            <button type="submit" id="changeMyPasswordSubmitBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>Change Password</button>
                             <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
                         </div>
                     </form>
@@ -93,9 +96,54 @@
                         <div class="mb-4">
                             <label for="importFile" class="block text-gray-700 text-sm font-bold mb-2 text-left">CSV File</label>
                             <input type="file" id="importFile" name="importFile" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required accept=".csv">
+                            <div id="importFileValidation" class="text-sm mt-1 hidden"></div>
                         </div>
                         <div class="mt-4">
-                            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Import</button>
+                            <button type="submit" id="importSubmitBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>Import</button>
+                            <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Tags Modal -->
+    <div id="exportTagsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Export Tags</h3>
+                <div class="mt-2 px-7 py-3">
+                    <form id="exportTagsForm">
+                        <div class="mb-4">
+                            <label for="exportTagsFilename" class="block text-gray-700 text-sm font-bold mb-2 text-left">Filename</label>
+                            <input type="text" id="exportTagsFilename" name="filename" value="tags_export.csv" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                            <div id="exportTagsFilenameValidation" class="text-sm mt-1 hidden"></div>
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit" id="exportTagsSubmitBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Export</button>
+                            <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Passwords Modal -->
+    <div id="exportPasswordsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Export Passwords</h3>
+                <div class="mt-2 px-7 py-3">
+                    <form id="exportPasswordsForm">
+                        <div class="mb-4">
+                            <label for="exportPasswordsFilename" class="block text-gray-700 text-sm font-bold mb-2 text-left">Filename</label>
+                            <input type="text" id="exportPasswordsFilename" name="filename" value="passwords_export.csv" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                            <div id="exportPasswordsFilenameValidation" class="text-sm mt-1 hidden"></div>
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit" id="exportPasswordsSubmitBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Export</button>
                             <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
                         </div>
                     </form>
@@ -109,11 +157,87 @@
             const changeMyPasswordBtn = document.getElementById('changeMyPasswordBtn');
             const changeMyPasswordModal = document.getElementById('changeMyPasswordModal');
             const changeMyPasswordForm = document.getElementById('changeMyPasswordForm');
+            
+            // Change password validation elements
+            const currentPasswordInput = document.getElementById('currentPassword');
+            const newPasswordInput = document.getElementById('newPassword');
+            const confirmNewPasswordInput = document.getElementById('confirmNewPassword');
+            const currentPasswordValidation = document.getElementById('currentPasswordValidation');
+            const newPasswordValidation = document.getElementById('newPasswordValidation');
+            const confirmNewPasswordValidation = document.getElementById('confirmNewPasswordValidation');
+            const changeMyPasswordSubmitBtn = document.getElementById('changeMyPasswordSubmitBtn');
+
+            // Change password validation function
+            function validateChangePasswordForm() {
+                let isValid = true;
+
+                // Validate current password
+                const currentPassword = currentPasswordInput.value;
+                if (currentPassword === '') {
+                    currentPasswordValidation.textContent = 'Current password is required';
+                    currentPasswordValidation.className = 'text-sm mt-1 text-red-600';
+                    currentPasswordValidation.classList.remove('hidden');
+                    isValid = false;
+                } else {
+                    currentPasswordValidation.classList.add('hidden');
+                }
+
+                // Validate new password
+                const newPassword = newPasswordInput.value;
+                if (newPassword === '') {
+                    newPasswordValidation.textContent = 'New password is required';
+                    newPasswordValidation.className = 'text-sm mt-1 text-red-600';
+                    newPasswordValidation.classList.remove('hidden');
+                    isValid = false;
+                } else if (newPassword.length < 6) {
+                    newPasswordValidation.textContent = 'New password must be at least 6 characters long';
+                    newPasswordValidation.className = 'text-sm mt-1 text-red-600';
+                    newPasswordValidation.classList.remove('hidden');
+                    isValid = false;
+                } else {
+                    newPasswordValidation.classList.add('hidden');
+                }
+
+                // Validate confirm password
+                const confirmNewPassword = confirmNewPasswordInput.value;
+                if (confirmNewPassword === '') {
+                    confirmNewPasswordValidation.textContent = 'Please confirm your new password';
+                    confirmNewPasswordValidation.className = 'text-sm mt-1 text-red-600';
+                    confirmNewPasswordValidation.classList.remove('hidden');
+                    isValid = false;
+                } else if (newPassword !== confirmNewPassword) {
+                    confirmNewPasswordValidation.textContent = 'Passwords do not match';
+                    confirmNewPasswordValidation.className = 'text-sm mt-1 text-red-600';
+                    confirmNewPasswordValidation.classList.remove('hidden');
+                    isValid = false;
+                } else {
+                    confirmNewPasswordValidation.classList.add('hidden');
+                }
+
+                // Enable/disable submit button
+                changeMyPasswordSubmitBtn.disabled = !isValid;
+                return isValid;
+            }
+
+            // Add event listeners for real-time validation
+            if (currentPasswordInput) currentPasswordInput.addEventListener('input', validateChangePasswordForm);
+            if (newPasswordInput) newPasswordInput.addEventListener('input', validateChangePasswordForm);
+            if (confirmNewPasswordInput) confirmNewPasswordInput.addEventListener('input', validateChangePasswordForm);
 
             if (changeMyPasswordBtn) {
                 changeMyPasswordBtn.addEventListener('click', (e) => {
                     e.preventDefault();
                     if (changeMyPasswordModal) {
+                        // Reset form and validation state
+                        changeMyPasswordForm.reset();
+                        currentPasswordValidation.classList.add('hidden');
+                        newPasswordValidation.classList.add('hidden');
+                        confirmNewPasswordValidation.classList.add('hidden');
+                        changeMyPasswordSubmitBtn.disabled = true;
+                        // Reset password field types (eye icons will be handled by common code)
+                        currentPasswordInput.type = 'password';
+                        newPasswordInput.type = 'password';
+                        confirmNewPasswordInput.type = 'password';
                         changeMyPasswordModal.classList.remove('hidden');
                     }
                 });
@@ -122,6 +246,12 @@
             if (changeMyPasswordForm) {
                 changeMyPasswordForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
+                    
+                    // Check validation before submitting
+                    if (!validateChangePasswordForm()) {
+                        return;
+                    }
+                    
                     const newPassword = document.getElementById('newPassword').value;
                     const confirmNewPassword = document.getElementById('confirmNewPassword').value;
 
@@ -164,12 +294,52 @@
             const importForm = document.getElementById('importForm');
             const importTagsBtn = document.getElementById('importTagsBtn');
             const importPasswordsBtn = document.getElementById('importPasswordsBtn');
+            
+            // Import validation elements
+            const importFileInput = document.getElementById('importFile');
+            const importFileValidation = document.getElementById('importFileValidation');
+            const importSubmitBtn = document.getElementById('importSubmitBtn');
+
+            // Import validation function
+            function validateImportForm() {
+                let isValid = true;
+
+                // Validate file selection
+                const files = importFileInput.files;
+                if (files.length === 0) {
+                    importFileValidation.textContent = 'Please select a CSV file to import';
+                    importFileValidation.className = 'text-sm mt-1 text-red-600';
+                    importFileValidation.classList.remove('hidden');
+                    isValid = false;
+                } else {
+                    const file = files[0];
+                    if (!file.name.toLowerCase().endsWith('.csv')) {
+                        importFileValidation.textContent = 'Please select a valid CSV file';
+                        importFileValidation.className = 'text-sm mt-1 text-red-600';
+                        importFileValidation.classList.remove('hidden');
+                        isValid = false;
+                    } else {
+                        importFileValidation.classList.add('hidden');
+                    }
+                }
+
+                // Enable/disable submit button
+                importSubmitBtn.disabled = !isValid;
+                return isValid;
+            }
+
+            // Add event listener for file input validation
+            if (importFileInput) importFileInput.addEventListener('change', validateImportForm);
 
             if (importTagsBtn) {
                 importTagsBtn.addEventListener('click', (e) => {
                     e.preventDefault();
                     importModalTitle.textContent = 'Import Tags';
                     importForm.action = '/import/tags';
+                    // Reset form and validation state
+                    importForm.reset();
+                    importFileValidation.classList.add('hidden');
+                    importSubmitBtn.disabled = true;
                     importModal.classList.remove('hidden');
                 });
             }
@@ -179,6 +349,10 @@
                     e.preventDefault();
                     importModalTitle.textContent = 'Import Passwords';
                     importForm.action = '/import/passwords';
+                    // Reset form and validation state
+                    importForm.reset();
+                    importFileValidation.classList.add('hidden');
+                    importSubmitBtn.disabled = true;
                     importModal.classList.remove('hidden');
                 });
             }
@@ -186,6 +360,12 @@
             if (importForm) {
                 importForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
+                    
+                    // Check validation before submitting
+                    if (!validateImportForm()) {
+                        return;
+                    }
+                    
                     const formData = new FormData(importForm);
                     const action = importForm.action;
 
@@ -217,11 +397,78 @@
                 });
             }
 
+            // Export functionality
+            const exportTagsBtn = document.getElementById('exportTagsBtn');
+            const exportPasswordsBtn = document.getElementById('exportPasswordsBtn');
+            const exportTagsModal = document.getElementById('exportTagsModal');
+            const exportPasswordsModal = document.getElementById('exportPasswordsModal');
+            const exportTagsForm = document.getElementById('exportTagsForm');
+            const exportPasswordsForm = document.getElementById('exportPasswordsForm');
+            const exportTagsFilename = document.getElementById('exportTagsFilename');
+            const exportPasswordsFilename = document.getElementById('exportPasswordsFilename');
+
+            if (exportTagsBtn) {
+                exportTagsBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    exportTagsModal.classList.remove('hidden');
+                });
+            }
+
+            if (exportPasswordsBtn) {
+                exportPasswordsBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    exportPasswordsModal.classList.remove('hidden');
+                });
+            }
+
+            if (exportTagsForm) {
+                exportTagsForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const filename = exportTagsFilename.value.trim();
+                    if (filename) {
+                        window.location.href = `/export/tags?filename=${encodeURIComponent(filename)}`;
+                        exportTagsModal.classList.add('hidden');
+                    }
+                });
+            }
+
+            if (exportPasswordsForm) {
+                exportPasswordsForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const filename = exportPasswordsFilename.value.trim();
+                    if (filename) {
+                        window.location.href = `/export/passwords?filename=${encodeURIComponent(filename)}`;
+                        exportPasswordsModal.classList.add('hidden');
+                    }
+                });
+            }
+
 
             // Generic close modal functionality
             document.querySelectorAll('.close-modal').forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    e.target.closest('.fixed').classList.add('hidden');
+                    const modal = e.target.closest('.fixed');
+                    
+                    // Reset validation states for specific modals
+                    if (modal.id === 'changeMyPasswordModal') {
+                        currentPasswordValidation.classList.add('hidden');
+                        newPasswordValidation.classList.add('hidden');
+                        confirmNewPasswordValidation.classList.add('hidden');
+                        changeMyPasswordSubmitBtn.disabled = true;
+                        // Reset password field types (eye icons will be handled by common code)
+                        currentPasswordInput.type = 'password';
+                        newPasswordInput.type = 'password';
+                        confirmNewPasswordInput.type = 'password';
+                    } else if (modal.id === 'importModal') {
+                        importFileValidation.classList.add('hidden');
+                        importSubmitBtn.disabled = true;
+                    } else if (modal.id === 'exportTagsModal') {
+                        exportTagsFilename.value = 'tags_export.csv';
+                    } else if (modal.id === 'exportPasswordsModal') {
+                        exportPasswordsFilename.value = 'passwords_export.csv';
+                    }
+                    
+                    modal.classList.add('hidden');
                 });
             });
 
@@ -244,6 +491,20 @@
                     }
                 });
             });
+
+            // Function to reset all password toggles to default state
+            function resetPasswordToggles() {
+                document.querySelectorAll('.toggle-password-visibility').forEach(toggle => {
+                    const targetId = toggle.dataset.target;
+                    const passwordInput = document.getElementById(targetId);
+                    const icon = toggle.querySelector('i');
+                    if (passwordInput && icon) {
+                        passwordInput.type = 'password';
+                        icon.classList.remove('fa-eye-slash');
+                        icon.classList.add('fa-eye');
+                    }
+                });
+            }
         });
     </script>
 </body>

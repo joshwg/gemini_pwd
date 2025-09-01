@@ -41,13 +41,6 @@ func renderStandaloneTemplate(w http.ResponseWriter, name string) {
 
 // loginHandler serves the login page and handles login requests.
 func loginHandler(w http.ResponseWriter, r *http.Request) {
-	// Apply security headers to login page too
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("X-Frame-Options", "DENY")
-	w.Header().Set("X-XSS-Protection", "1; mode=block")
-	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-	w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; script-src 'self' https://cdn.jsdelivr.net; font-src 'self' https://cdnjs.cloudflare.com")
-
 	if r.Method == http.MethodPost {
 		username := r.FormValue("username")
 		password := r.FormValue("password")
@@ -322,6 +315,66 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
+		// Check if requesting a specific password by ID for editing
+		passwordID := r.URL.Query().Get("id")
+		action := r.URL.Query().Get("action")
+
+		if passwordID != "" {
+			// Fetch individual password for editing or copying
+			id, err := strconv.Atoi(passwordID)
+			if err != nil {
+				http.Error(w, "Invalid password ID", http.StatusBadRequest)
+				return
+			}
+
+			// Get the password entry with user verification
+			password, err := getPasswordByID(currentUser.ID, id)
+			if err != nil {
+				log.Printf("Error retrieving password for user %d, ID %d: %v", currentUser.ID, id, err)
+				http.Error(w, "Password not found", http.StatusNotFound)
+				return
+			}
+
+			if action == "copy" {
+				// For copy action, decrypt and return only the password value
+				decryptedPassword, err := getDecryptedPassword(currentUser.ID, id)
+				if err != nil {
+					log.Printf("Error decrypting password for copy: %v", err)
+					http.Error(w, "Failed to decrypt password", http.StatusInternalServerError)
+					return
+				}
+
+				// Return only the password value as plain text
+				w.Header().Set("Content-Type", "text/plain")
+				w.Write([]byte(decryptedPassword))
+				return
+			} else {
+				// For edit action, decrypt password and notes fields
+				decryptedPassword, err := getDecryptedPassword(currentUser.ID, id)
+				if err != nil {
+					log.Printf("Error decrypting password for edit: %v", err)
+					http.Error(w, "Failed to decrypt password", http.StatusInternalServerError)
+					return
+				}
+
+				decryptedNotes, err := getDecryptedNotes(currentUser.ID, id)
+				if err != nil {
+					log.Printf("Error decrypting notes for edit: %v", err)
+					http.Error(w, "Failed to decrypt notes", http.StatusInternalServerError)
+					return
+				}
+
+				// Populate the decrypted fields
+				password.Password = decryptedPassword
+				password.Notes = decryptedNotes
+
+				// Return the full password entry with decrypted password and notes
+				json.NewEncoder(w).Encode(password)
+				return
+			}
+		}
+
+		// Default behavior: fetch all passwords (without decrypted password/notes)
 		query := r.URL.Query().Get("q")
 		passwords, err := getPasswords(currentUser.ID, query)
 		if err != nil {
@@ -342,8 +395,8 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		if data.Site == "" || data.Username == "" || data.Password == "" {
-			http.Error(w, "Site, username, and password are required", http.StatusBadRequest)
+		if data.Site == "" || data.Username == "" {
+			http.Error(w, "Site and username are required", http.StatusBadRequest)
 			return
 		}
 
@@ -351,7 +404,31 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, fmt.Sprintf("Failed to create password: %v", err), http.StatusInternalServerError)
 			return
 		}
+
+		// Fetch the created password entry to return it (without sensitive data)
+		passwords, err := getPasswords(currentUser.ID, "")
+		if err != nil {
+			log.Printf("Error retrieving passwords after creation: %v", err)
+			http.Error(w, "Password created but failed to retrieve", http.StatusInternalServerError)
+			return
+		}
+
+		// Find the most recently created password for this user
+		var createdPassword *PasswordEntry
+		for _, p := range passwords {
+			if p.Site == data.Site && p.Username == data.Username {
+				createdPassword = &p
+				break
+			}
+		}
+
+		if createdPassword == nil {
+			http.Error(w, "Password created but not found", http.StatusInternalServerError)
+			return
+		}
+
 		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(createdPassword)
 	case http.MethodDelete:
 		passwordID := r.URL.Query().Get("id")
 		if passwordID == "" {
@@ -510,6 +587,16 @@ func exportTagsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get filename from query parameter, default if not provided
+	filename := r.URL.Query().Get("filename")
+	if filename == "" {
+		filename = "tags_export.csv"
+	}
+	// Ensure .csv extension
+	if !strings.HasSuffix(strings.ToLower(filename), ".csv") {
+		filename += ".csv"
+	}
+
 	tags, err := getTags(currentUser.ID)
 	if err != nil {
 		http.Error(w, "Failed to retrieve tags for export", http.StatusInternalServerError)
@@ -518,7 +605,7 @@ func exportTagsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment;filename=tags_export.csv")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=%s", filename))
 
 	writer := csv.NewWriter(w)
 	defer writer.Flush()
@@ -544,7 +631,7 @@ func importTagsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, _, err := r.FormFile("csvfile")
+	file, _, err := r.FormFile("importFile")
 	if err != nil {
 		http.Error(w, "Failed to read uploaded file", http.StatusBadRequest)
 		log.Printf("Error reading form file: %v", err)
@@ -570,14 +657,14 @@ func importTagsHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		// record[0] = Name, record[1] = Description, record[2] = Color
-		err := createTag(currentUser.ID, record[0], record[1], record[2])
+		err := createOrUpdateTag(currentUser.ID, record[0], record[1], record[2])
 		if err != nil {
 			// Log error but continue processing other tags
 			log.Printf("Failed to import tag '%s' on line %d: %v", record[0], i+1, err)
 		}
 	}
 
-	http.Redirect(w, r, "/tags", http.StatusSeeOther)
+	w.Write([]byte("Tags imported successfully"))
 }
 
 func exportPasswordsHandler(w http.ResponseWriter, r *http.Request) {
@@ -585,6 +672,16 @@ func exportPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 	if !ok || currentUser == nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
+	}
+
+	// Get filename from query parameter, default if not provided
+	filename := r.URL.Query().Get("filename")
+	if filename == "" {
+		filename = "passwords_export.csv"
+	}
+	// Ensure .csv extension
+	if !strings.HasSuffix(strings.ToLower(filename), ".csv") {
+		filename += ".csv"
 	}
 
 	passwords, err := getAllDecryptedPasswords(currentUser.ID)
@@ -595,7 +692,7 @@ func exportPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment;filename=passwords_export.csv")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=%s", filename))
 
 	writer := csv.NewWriter(w)
 	defer writer.Flush()
@@ -603,7 +700,12 @@ func exportPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 	writer.Write([]string{"Site", "Username", "Password", "Notes", "Tags"})
 
 	for _, p := range passwords {
-		tagsStr := strings.Join(p.Tags, ";") // Use semicolon in case a tag name has a comma
+		// Extract tag names for CSV export
+		tagNames := make([]string, len(p.Tags))
+		for i, tag := range p.Tags {
+			tagNames[i] = tag.Name
+		}
+		tagsStr := strings.Join(tagNames, ";") // Use semicolon in case a tag name has a comma
 		writer.Write([]string{p.Site, p.Username, p.Password, p.Notes, tagsStr})
 	}
 }
@@ -620,7 +722,7 @@ func importPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, _, err := r.FormFile("csvfile")
+	file, _, err := r.FormFile("importFile")
 	if err != nil {
 		http.Error(w, "Failed to read uploaded file", http.StatusBadRequest)
 		return
@@ -639,22 +741,86 @@ func importPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if len(record) < 5 {
-			log.Printf("Skipping malformed password record on line %d", i+1)
+			log.Printf("Skipping malformed password record on line %d: expected 5 columns (site, username, password, notes, tags), got %d columns: %v", i+1, len(record), record)
 			continue
 		}
 		site, username, password, notes, tagsStr := record[0], record[1], record[2], record[3], record[4]
+
+		// Validate required fields
+		if strings.TrimSpace(site) == "" {
+			log.Printf("Skipping password record on line %d: site field is empty", i+1)
+			continue
+		}
+		if strings.TrimSpace(username) == "" {
+			log.Printf("Skipping password record on line %d: username field is empty", i+1)
+			continue
+		}
+
 		tags := strings.Split(tagsStr, ";")
 
 		// Trim whitespace from tags
-		for i, t := range tags {
-			tags[i] = strings.TrimSpace(t)
+		for j, t := range tags {
+			tags[j] = strings.TrimSpace(t)
 		}
 
-		err := createPasswordEntry(currentUser.ID, site, username, password, notes, tags)
+		err := createOrUpdatePasswordEntry(currentUser.ID, site, username, password, notes, tags)
 		if err != nil {
 			log.Printf("Failed to import password for site '%s' on line %d: %v", site, i+1, err)
 		}
 	}
 
-	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+	w.Write([]byte("Passwords imported successfully"))
+}
+
+// checkPasswordDuplicateHandler checks if a password entry already exists
+func checkPasswordDuplicateHandler(w http.ResponseWriter, r *http.Request) {
+	currentUser, ok := getUserFromContext(r)
+	if !ok || currentUser == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var request struct {
+		Site     string `json:"site"`
+		Username string `json:"username"`
+		ID       int    `json:"id,omitempty"` // For edit mode, exclude this entry from duplicate check
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Check for existing password entry (unique by site and username)
+	var count int
+	var err error
+
+	if request.ID > 0 {
+		// Edit mode - exclude the current entry from duplicate check
+		err = db.QueryRow("SELECT COUNT(*) FROM password_entries WHERE user_id = ? AND site = ? AND username = ? AND id != ? COLLATE NOCASE",
+			currentUser.ID, request.Site, request.Username, request.ID).Scan(&count)
+	} else {
+		// Add mode - check for any duplicates
+		err = db.QueryRow("SELECT COUNT(*) FROM password_entries WHERE user_id = ? AND site = ? AND username = ? COLLATE NOCASE",
+			currentUser.ID, request.Site, request.Username).Scan(&count)
+	}
+
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	response := struct {
+		IsDuplicate bool `json:"isDuplicate"`
+	}{
+		IsDuplicate: count > 0,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }

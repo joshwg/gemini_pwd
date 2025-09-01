@@ -10,14 +10,15 @@ type User struct {
 
 // PasswordEntry represents a password entry in the system.
 type PasswordEntry struct {
-	ID        int      `json:"id"`
-	Site      string   `json:"site"`
-	Username  string   `json:"username"`
-	Password  string   `json:"password,omitempty"` // omitempty to not send password back to frontend by default
-	Notes     string   `json:"notes,omitempty"`
-	Salt      []byte   `json:"-"` // Do not expose salt to the frontend
-	Tags      []string `json:"tags"`
-	CreatedAt string   `json:"createdAt"`
+	ID         int    `json:"id"`
+	Site       string `json:"site"`
+	Username   string `json:"username"`
+	Password   string `json:"password,omitempty"` // omitempty to not send password back to frontend by default
+	Notes      string `json:"notes,omitempty"`
+	Salt       []byte `json:"-"` // Do not expose salt to the frontend
+	Tags       []Tag  `json:"tags"`
+	CreatedAt  string `json:"createdAt"`
+	ModifiedAt string `json:"modifiedAt"`
 }
 
 // Tag represents a tag in the system.
