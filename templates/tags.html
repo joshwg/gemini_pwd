@@ -90,6 +90,12 @@
 
 <script>
     const API_ORIGIN = window.location.origin;
+    const DEFAULT_TAG_COLOR = '#6B7280'; // dark gray - matches backend defaultTagColor
+    
+    // Utility function to get tag color with fallback to default
+    function getTagColor(color) {
+        return color && color.trim() !== '' ? color : DEFAULT_TAG_COLOR;
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
         const tagTableBody = document.getElementById('tagTableBody');
@@ -292,7 +298,7 @@
                 tagID.value = tag.id;
                 tagName.value = tag.name;
                 tagDescription.value = tag.description;
-                tagColor.value = tag.color;
+                tagColor.value = getTagColor(tag.color);
                 tagModal.classList.remove('hidden');
                 // Trigger validation for the current name
                 validateTagName();
@@ -304,6 +310,22 @@
 
         function renderTags(tags) {
             tagTableBody.innerHTML = '';
+            
+            // Handle empty state
+            if (tags.length === 0) {
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = 
+                    '<td colspan="4" class="py-8 px-6 text-center text-gray-500">' +
+                        '<div class="flex flex-col items-center">' +
+                            '<i class="fas fa-tags text-3xl text-gray-300 mb-2"></i>' +
+                            '<p class="text-lg font-medium">No tags found</p>' +
+                            '<p class="text-sm">Create your first tag to organize your passwords</p>' +
+                        '</div>' +
+                    '</td>';
+                tagTableBody.appendChild(emptyRow);
+                return;
+            }
+            
             tags.forEach(tag => {
                 const row = document.createElement('tr');
                 row.className = 'border-b border-gray-200 hover:bg-gray-100';
@@ -311,7 +333,7 @@
                     <td class="py-3 px-6 text-left break-all">${tag.name}</td>
                     <td class="py-3 px-6 text-left break-all">${tag.description}</td>
                     <td class="py-3 px-6 text-left">
-                        <span class="inline-block w-6 h-6 rounded-full" style="background-color: ${tag.color};"></span>
+                        <span class="inline-block w-6 h-6 rounded-full" style="background-color: ${getTagColor(tag.color)};"></span>
                     </td>
                     <td class="py-3 px-6 text-center">
                         <div class="flex item-center justify-center">

@@ -101,6 +101,39 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	renderStandaloneTemplate(w, "login.html")
 }
 
+// rateLimitCheckHandler provides an API to check rate limit status for login attempts
+func rateLimitCheckHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	username := r.FormValue("username")
+	clientIP := getClientIP(r)
+
+	if username == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"isLimited":     false,
+			"remainingTime": 0,
+		})
+		return
+	}
+
+	isLimited, cooldownTime, err := checkRateLimit(username, clientIP)
+	if err != nil {
+		log.Printf("Error checking rate limit for API: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"isLimited":     isLimited,
+		"remainingTime": int(cooldownTime.Seconds()),
+	})
+}
+
 // dashboardHandler serves the main user dashboard.
 func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := getUserFromContext(r)
@@ -465,7 +498,9 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		log.Printf("Updating password entry: userID=%d, entryID=%d, site=%s, username=%s, tags=%v", currentUser.ID, data.ID, data.Site, data.Username, data.Tags)
 		if err := updatePasswordEntry(currentUser.ID, data.ID, data.Site, data.Username, data.Password, data.Notes, data.Tags); err != nil {
+			log.Printf("Error updating password entry: %v", err)
 			http.Error(w, fmt.Sprintf("Failed to update password: %v", err), http.StatusInternalServerError)
 			return
 		}

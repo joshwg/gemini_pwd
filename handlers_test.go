@@ -11,6 +11,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Helper function to create a request with a user context
@@ -961,4 +963,372 @@ func TestCheckPasswordDuplicateHandler(t *testing.T) {
 	if !strings.Contains(rr.Body.String(), `"isDuplicate":false`) {
 		t.Errorf("check duplicate should not have found duplicate: %s", rr.Body.String())
 	}
+}
+
+// TestNewUserEmptyState tests that a newly created user has empty passwords and tags.
+func TestNewUserEmptyState(t *testing.T) {
+	// Setup: Clean database and create a fresh user
+	db.Exec("DELETE FROM password_entries")
+	db.Exec("DELETE FROM tags")
+	db.Exec("DELETE FROM users")
+
+	// Create a new user
+	newUser := &User{ID: 1, Username: "newuser", IsAdmin: false}
+	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'newuser', 'hash', 0)")
+
+	// Test 1: Check that passwords API returns empty array
+	req := newRequestWithUser("GET", "/api/passwords", "", newUser)
+	rr := httptest.NewRecorder()
+	passwordsAPIHandler(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("GET /api/passwords for new user returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	// Verify empty passwords array
+	if body := strings.TrimSpace(rr.Body.String()); body != "[]" {
+		t.Errorf("Expected new user to have empty password list '[]', but got '%s'", body)
+	}
+
+	// Test 2: Check that tags API returns empty array
+	req = newRequestWithUser("GET", "/api/tags", "", newUser)
+	rr = httptest.NewRecorder()
+	tagsAPIHandler(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("GET /api/tags for new user returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	// Verify empty tags array
+	if body := strings.TrimSpace(rr.Body.String()); body != "[]" {
+		t.Errorf("Expected new user to have empty tag list '[]', but got '%s'", body)
+	}
+
+	// Test 3: Test search query on empty password set
+	req = newRequestWithUser("GET", "/api/passwords?q=test", "", newUser)
+	rr = httptest.NewRecorder()
+	passwordsAPIHandler(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("GET /api/passwords with query for new user returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	// Verify search on empty set returns empty array
+	if body := strings.TrimSpace(rr.Body.String()); body != "[]" {
+		t.Errorf("Expected search on empty password list to return '[]', but got '%s'", body)
+	}
+}
+
+// TestLoginPageHandler tests that the login page renders without authentication
+func TestLoginPageHandler(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+
+	// Test the login handler which should show login page
+	loginHandler(rr, req)
+
+	// Should return 200 OK for the login page
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Login page handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	// Check that the response contains login form elements
+	body := rr.Body.String()
+	if !strings.Contains(body, "Sign In") {
+		t.Errorf("Login page should contain 'Sign In' button")
+	}
+	if !strings.Contains(body, `id="username"`) {
+		t.Errorf("Login page should contain username input field")
+	}
+	if !strings.Contains(body, `id="password"`) {
+		t.Errorf("Login page should contain password input field")
+	}
+	if !strings.Contains(body, `id="signInButton"`) {
+		t.Errorf("Login page should contain signInButton with ID for JavaScript validation")
+	}
+	if !strings.Contains(body, "disabled") {
+		t.Errorf("Login page Sign In button should initially be disabled")
+	}
+}
+
+// TestLoginAuthentication tests comprehensive login scenarios
+func TestLoginAuthentication(t *testing.T) {
+	// Setup: Clean database and create test user
+	db.Exec("DELETE FROM login_attempts")
+	db.Exec("DELETE FROM users")
+
+	// Create a test user with properly hashed password
+	correctPassword := "correctpassword"
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(correctPassword), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'testuser', ?, 0)", string(hashedPassword))
+
+	t.Run("SuccessfulLogin", func(t *testing.T) {
+		// Test successful login with correct credentials
+		formData := "username=testuser&password=correctpassword"
+		req := httptest.NewRequest("POST", "/", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Real-IP", "192.168.1.100") // Set a test IP
+
+		rr := httptest.NewRecorder()
+		loginHandler(rr, req)
+
+		// Should redirect to dashboard on success
+		if status := rr.Code; status != http.StatusSeeOther {
+			t.Errorf("Successful login should redirect (303), got %v", status)
+		}
+
+		location := rr.Header().Get("Location")
+		if location != "/dashboard" {
+			t.Errorf("Expected redirect to /dashboard, got %s", location)
+		}
+	})
+
+	t.Run("InvalidCredentials", func(t *testing.T) {
+		// Test login with wrong password
+		formData := "username=testuser&password=wrongpassword"
+		req := httptest.NewRequest("POST", "/", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Real-IP", "192.168.1.100")
+
+		rr := httptest.NewRecorder()
+		loginHandler(rr, req)
+
+		// Should return 401 Unauthorized
+		if status := rr.Code; status != http.StatusUnauthorized {
+			t.Errorf("Invalid credentials should return 401, got %v", status)
+		}
+
+		body := rr.Body.String()
+		if !strings.Contains(body, "Invalid credentials") {
+			t.Errorf("Response should contain 'Invalid credentials', got: %s", body)
+		}
+	})
+
+	t.Run("NonexistentUser", func(t *testing.T) {
+		// Test login with nonexistent username
+		formData := "username=nonexistentuser&password=anypassword"
+		req := httptest.NewRequest("POST", "/", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Real-IP", "192.168.1.100")
+
+		rr := httptest.NewRecorder()
+		loginHandler(rr, req)
+
+		// Should return 401 Unauthorized
+		if status := rr.Code; status != http.StatusUnauthorized {
+			t.Errorf("Nonexistent user should return 401, got %v", status)
+		}
+	})
+
+	t.Run("MissingCredentials", func(t *testing.T) {
+		// Test login with missing username
+		formData := "password=somepassword"
+		req := httptest.NewRequest("POST", "/", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Real-IP", "192.168.1.100")
+
+		rr := httptest.NewRecorder()
+		loginHandler(rr, req)
+
+		// Should return 401 Unauthorized for missing credentials
+		if status := rr.Code; status != http.StatusUnauthorized {
+			t.Errorf("Missing username should return 401, got %v", status)
+		}
+
+		// Test missing password
+		formData = "username=testuser"
+		req = httptest.NewRequest("POST", "/", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Real-IP", "192.168.1.100")
+
+		rr = httptest.NewRecorder()
+		loginHandler(rr, req)
+
+		if status := rr.Code; status != http.StatusUnauthorized {
+			t.Errorf("Missing password should return 401, got %v", status)
+		}
+	})
+}
+
+// TestLoginRateLimiting tests rate limiting functionality
+func TestLoginRateLimiting(t *testing.T) {
+	// Setup: Clean database and create test user
+	db.Exec("DELETE FROM login_attempts")
+	db.Exec("DELETE FROM users")
+
+	// Create user with properly hashed password
+	correctPassword := "correctpassword"
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(correctPassword), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'ratelimituser', ?, 0)", string(hashedPassword))
+
+	testIP := "192.168.1.200"
+
+	t.Run("MultipleFailedAttempts", func(t *testing.T) {
+		// Make multiple failed login attempts to trigger rate limiting
+		for i := 0; i < 5; i++ {
+			formData := "username=ratelimituser&password=wrongpassword"
+			req := httptest.NewRequest("POST", "/", strings.NewReader(formData))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set("X-Real-IP", testIP)
+
+			rr := httptest.NewRecorder()
+			loginHandler(rr, req)
+
+			// First 3 attempts should return 401, then 429 for rate limiting
+			if i < 3 && rr.Code != http.StatusUnauthorized {
+				t.Errorf("Failed attempt %d should return 401, got %v", i+1, rr.Code)
+			} else if i >= 3 && rr.Code != http.StatusTooManyRequests {
+				t.Errorf("Rate limited attempt %d should return 429, got %v", i+1, rr.Code)
+			}
+		}
+
+		// The 6th attempt should be rate limited
+		formData := "username=ratelimituser&password=wrongpassword"
+		req := httptest.NewRequest("POST", "/", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Real-IP", testIP)
+
+		rr := httptest.NewRecorder()
+		loginHandler(rr, req)
+
+		// Should return 429 Too Many Requests
+		if status := rr.Code; status != http.StatusTooManyRequests {
+			t.Errorf("Rate limited attempt should return 429, got %v", status)
+		}
+
+		body := rr.Body.String()
+		if !strings.Contains(body, "Too many failed login attempts") {
+			t.Errorf("Rate limit response should mention failed attempts, got: %s", body)
+		}
+	})
+
+	t.Run("RateLimitedEvenWithCorrectPassword", func(t *testing.T) {
+		// Try to login with correct password while rate limited
+		formData := "username=ratelimituser&password=correctpassword"
+		req := httptest.NewRequest("POST", "/", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Real-IP", testIP)
+
+		rr := httptest.NewRecorder()
+		loginHandler(rr, req)
+
+		// Should still be rate limited even with correct password
+		if status := rr.Code; status != http.StatusTooManyRequests {
+			t.Errorf("Rate limited user with correct password should still return 429, got %v", status)
+		}
+	})
+}
+
+// TestRateLimitCheckAPI tests the rate limit check API endpoint
+func TestRateLimitCheckAPI(t *testing.T) {
+	// Setup: Clean database
+	db.Exec("DELETE FROM login_attempts")
+	db.Exec("DELETE FROM users")
+
+	// Create user with properly hashed password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'apitestuser', ?, 0)", string(hashedPassword))
+
+	t.Run("NoRateLimit", func(t *testing.T) {
+		// Check rate limit for user with no failed attempts
+		formData := "username=apitestuser"
+		req := httptest.NewRequest("POST", "/api/rate-limit-check", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Real-IP", "192.168.1.300")
+
+		rr := httptest.NewRecorder()
+		rateLimitCheckHandler(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Rate limit check should return 200, got %v", status)
+		}
+
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		if err != nil {
+			t.Fatalf("Failed to parse JSON response: %v", err)
+		}
+
+		if response["isLimited"] != false {
+			t.Errorf("Expected isLimited to be false, got %v", response["isLimited"])
+		}
+
+		if response["remainingTime"] != float64(0) {
+			t.Errorf("Expected remainingTime to be 0, got %v", response["remainingTime"])
+		}
+	})
+
+	t.Run("WithRateLimit", func(t *testing.T) {
+		testIP := "192.168.1.301"
+
+		// Create failed attempts to trigger rate limiting
+		for i := 0; i < 5; i++ {
+			recordLoginAttempt("apitestuser", testIP, false)
+		}
+
+		// Check rate limit status
+		formData := "username=apitestuser"
+		req := httptest.NewRequest("POST", "/api/rate-limit-check", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Real-IP", testIP)
+
+		rr := httptest.NewRecorder()
+		rateLimitCheckHandler(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Rate limit check should return 200, got %v", status)
+		}
+
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		if err != nil {
+			t.Fatalf("Failed to parse JSON response: %v", err)
+		}
+
+		if response["isLimited"] != true {
+			t.Errorf("Expected isLimited to be true, got %v", response["isLimited"])
+		}
+
+		remainingTime := response["remainingTime"].(float64)
+		if remainingTime <= 0 {
+			t.Errorf("Expected remainingTime to be > 0, got %v", remainingTime)
+		}
+	})
+
+	t.Run("EmptyUsername", func(t *testing.T) {
+		// Check rate limit with empty username
+		formData := ""
+		req := httptest.NewRequest("POST", "/api/rate-limit-check", strings.NewReader(formData))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Real-IP", "192.168.1.302")
+
+		rr := httptest.NewRecorder()
+		rateLimitCheckHandler(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("Rate limit check with empty username should return 200, got %v", status)
+		}
+
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		if err != nil {
+			t.Fatalf("Failed to parse JSON response: %v", err)
+		}
+
+		if response["isLimited"] != false {
+			t.Errorf("Expected isLimited to be false for empty username, got %v", response["isLimited"])
+		}
+	})
 }

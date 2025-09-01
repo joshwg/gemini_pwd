@@ -66,13 +66,13 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                         <div>
                             <label class="block text-gray-700 text-sm font-bold mb-2 text-left">Available Tags</label>
-                            <div id="tagList" class="flex flex-wrap items-start gap-2 p-2 border rounded-md bg-gray-300 h-32 overflow-y-auto">
+                            <div id="tagList" class="flex flex-wrap items-start content-start gap-1 p-2 border rounded-md bg-gray-300 h-32 overflow-y-auto">
                                 <!-- Available tags will be populated here -->
                             </div>
                         </div>
                         <div>
                             <label class="block text-gray-700 text-sm font-bold mb-2 text-left">Password Tags</label>
-                            <div id="passwordTagsContainer" class="flex flex-wrap items-start gap-2 p-2 border rounded-md bg-gray-300 h-32 overflow-y-auto min-h-[40px]">
+                            <div id="passwordTagsContainer" class="flex flex-wrap items-start content-start gap-1 p-2 border rounded-md bg-gray-300 h-32 overflow-y-auto min-h-[40px]">
                                 <!-- Tags associated with the password will be dropped here -->
                             </div>
                         </div>
@@ -119,6 +119,12 @@
 
 <script>
     const API_ORIGIN = window.location.origin;
+    const DEFAULT_TAG_COLOR = '#6B7280'; // dark gray - matches backend defaultTagColor
+    
+    // Utility function to get tag color with fallback to default
+    function getTagColor(color) {
+        return color && color.trim() !== '' ? color : DEFAULT_TAG_COLOR;
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
         const passwordTableBody = document.getElementById('passwordTableBody');
@@ -248,6 +254,8 @@
                 notesValidation.classList.add('hidden');
             }
             passwordSubmitBtn.disabled = true;
+            passwordSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            passwordSubmitBtn.classList.remove('hover:bg-blue-700');
             // Reset validation cache
             lastValidationParams = null;
             clearTimeout(validationTimeout);
@@ -284,7 +292,11 @@
                 tags: tags
             };
 
+            // Add ID to data if it's an update (PUT request)
             const method = passwordID.value ? 'PUT' : 'POST';
+            if (method === 'PUT') {
+                data.id = parseInt(passwordID.value);
+            }
             const url = passwordID.value ? (API_ORIGIN + '/api/passwords?id=' + passwordID.value) : (API_ORIGIN + '/api/passwords');
 
             const response = await fetch(url, {
@@ -339,6 +351,8 @@
                         notesValidation.classList.add('hidden');
                     }
                     passwordSubmitBtn.disabled = true;
+                    passwordSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    passwordSubmitBtn.classList.remove('hover:bg-blue-700');
                     // Reset validation cache
                     lastValidationParams = null;
                     clearTimeout(validationTimeout);
@@ -423,8 +437,15 @@
                 }
             }
 
-            // Enable/disable submit button
+            // Enable/disable submit button with visual feedback
             passwordSubmitBtn.disabled = !isValid;
+            if (isValid) {
+                passwordSubmitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                passwordSubmitBtn.classList.add('hover:bg-blue-700');
+            } else {
+                passwordSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                passwordSubmitBtn.classList.remove('hover:bg-blue-700');
+            }
             return isValid;
         }
 
@@ -442,6 +463,8 @@
                         passwordUsernameValidation.className = 'text-sm mt-1 text-red-600';
                         passwordUsernameValidation.classList.remove('hidden');
                         passwordSubmitBtn.disabled = true;
+                        passwordSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                        passwordSubmitBtn.classList.remove('hover:bg-blue-700');
                     } else {
                         passwordUsernameValidation.classList.add('hidden');
                         // Re-run basic validation to update submit button state
@@ -528,7 +551,7 @@
         function addTagToPassword(sourceTagElement) {
             const tagId = sourceTagElement.dataset.id;
             const tagName = sourceTagElement.dataset.name;
-            const tagColor = sourceTagElement.dataset.color;
+            const tagColor = getTagColor(sourceTagElement.dataset.color);
             
             // Prevent duplicate tags
             if (passwordTagsContainer.querySelector('[data-id="' + tagId + '"]')) {
@@ -563,7 +586,10 @@
             sourceTagElement.remove();
             
             // Sort remaining available tags
-            sortTagsInContainer(tagListContainer);
+            const tagListContainer = document.getElementById('tagList');
+            if (tagListContainer) {
+                sortTagsInContainer(tagListContainer);
+            }
             
             // Trigger validation when tags are added
             performRealTimeValidation();
@@ -601,14 +627,15 @@
                 // Clear and populate tags
                 passwordTagsContainer.innerHTML = '';
                 password.tags.forEach(tag => {
+                    const tagColor = getTagColor(tag.color);
                     const tagElement = document.createElement('span');
                     tagElement.className = 'tag-item text-xs font-semibold inline-block py-0.5 px-3 rounded border last:mr-0 mr-1 cursor-pointer break-all';
-                    tagElement.style.backgroundColor = tag.color;
-                    tagElement.style.color = getTextColor(tag.color);
-                    tagElement.style.border = getBorderStyle(tag.color);
+                    tagElement.style.backgroundColor = tagColor;
+                    tagElement.style.color = getTextColor(tagColor);
+                    tagElement.style.border = getBorderStyle(tagColor);
                     tagElement.dataset.id = tag.id;
                     tagElement.dataset.name = tag.name;
-                    tagElement.dataset.color = tag.color;
+                    tagElement.dataset.color = tagColor;
                     tagElement.draggable = true;
                     tagElement.textContent = tag.name;
                     tagElement.addEventListener('click', () => {
@@ -674,14 +701,31 @@
 
         function renderPasswords(passwords) {
             passwordTableBody.innerHTML = '';
+            
+            // Handle empty state
+            if (passwords.length === 0) {
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = 
+                    '<td colspan="6" class="py-8 px-6 text-center text-gray-500">' +
+                        '<div class="flex flex-col items-center">' +
+                            '<i class="fas fa-key text-3xl text-gray-300 mb-2"></i>' +
+                            '<p class="text-lg font-medium">No passwords found</p>' +
+                            '<p class="text-sm">Add your first password to get started</p>' +
+                        '</div>' +
+                    '</td>';
+                passwordTableBody.appendChild(emptyRow);
+                return;
+            }
+            
             passwords.forEach(p => {
                 const row = document.createElement('tr');
                 row.className = 'border-b border-gray-200 hover:bg-gray-100';
                 
                 const tagsHTML = p.tags.map(tag => {
-                    const textColor = getTextColor(tag.color);
-                    const borderStyle = getBorderStyle(tag.color);
-                    return '<span class="tag-item text-xs font-semibold inline-block py-0.5 px-3 rounded border last:mr-0 mr-1 break-all" style="background-color: ' + tag.color + '; color: ' + textColor + '; border: ' + borderStyle + ';">' + tag.name + '</span>';
+                    const tagColor = getTagColor(tag.color);
+                    const textColor = getTextColor(tagColor);
+                    const borderStyle = getBorderStyle(tagColor);
+                    return '<span class="tag-item text-xs font-semibold inline-block py-0.5 px-3 rounded border last:mr-0 mr-1 break-all" style="background-color: ' + tagColor + '; color: ' + textColor + '; border: ' + borderStyle + ';">' + tag.name + '</span>';
                 }).join('');
                 
                 // Password display area with show/hide and copy functionality
@@ -734,14 +778,15 @@
             const availableTags = tags.filter(tag => !usedTagIds.includes(tag.id.toString()));
             
             availableTags.forEach(tag => {
+                const tagColor = getTagColor(tag.color);
                 const tagElement = document.createElement('span');
                 tagElement.className = 'tag-item text-xs font-semibold inline-block py-0.5 px-3 rounded border last:mr-0 mr-1 cursor-pointer break-all';
-                tagElement.style.backgroundColor = tag.color;
-                tagElement.style.color = getTextColor(tag.color);
-                tagElement.style.border = getBorderStyle(tag.color);
+                tagElement.style.backgroundColor = tagColor;
+                tagElement.style.color = getTextColor(tagColor);
+                tagElement.style.border = getBorderStyle(tagColor);
                 tagElement.dataset.id = tag.id;
                 tagElement.dataset.name = tag.name;
-                tagElement.dataset.color = tag.color;
+                tagElement.dataset.color = tagColor;
                 tagElement.draggable = true;
                 tagElement.innerHTML = tag.name; // No edit/delete buttons on dashboard
                 

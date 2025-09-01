@@ -11,6 +11,18 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// Default color for tags imported without a color
+const defaultTagColor = "#6B7280" // dark gray
+
+// updateEmptyTagColors updates all tags with empty colors to use the default color
+func updateEmptyTagColors() error {
+	_, err := db.Exec("UPDATE tags SET color = ? WHERE color = '' OR color IS NULL", defaultTagColor)
+	if err != nil {
+		return fmt.Errorf("failed to update empty tag colors: %w", err)
+	}
+	return nil
+}
+
 // The User, PasswordEntry, and Tag structs are assumed to be in models.go
 // as per our previous conversation.
 
@@ -544,8 +556,8 @@ func createPasswordEntry(userID int, site, username, password, notes string, tag
 		err := tx.QueryRow("SELECT id FROM tags WHERE user_id = ? AND name = ? COLLATE NOCASE", userID, tagName).Scan(&tagID)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				// Create the tag if it doesn't exist with empty description
-				res, err := tx.Exec("INSERT INTO tags (user_id, name, description, color) VALUES (?, ?, '', '')", userID, tagName)
+				// Create the tag if it doesn't exist with default color
+				res, err := tx.Exec("INSERT INTO tags (user_id, name, description, color) VALUES (?, ?, '', ?)", userID, tagName, defaultTagColor)
 				if err != nil {
 					return fmt.Errorf("failed to create tag: %w", err)
 				}
@@ -631,8 +643,8 @@ func createPasswordEntryWithTags(userID int, site, username, password, notes str
 		err := tx.QueryRow("SELECT id FROM tags WHERE user_id = ? AND name = ? COLLATE NOCASE", userID, tagName).Scan(&tagID)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				// Create the tag if it doesn't exist with empty description
-				res, err := tx.Exec("INSERT INTO tags (user_id, name, description, color) VALUES (?, ?, '', '')", userID, tagName)
+				// Create the tag if it doesn't exist with default color
+				res, err := tx.Exec("INSERT INTO tags (user_id, name, description, color) VALUES (?, ?, '', ?)", userID, tagName, defaultTagColor)
 				if err != nil {
 					return fmt.Errorf("failed to create tag: %w", err)
 				}
@@ -696,8 +708,8 @@ func updatePasswordEntry(userID, id int, site, username, password, notes string,
 		err := tx.QueryRow("SELECT id FROM tags WHERE user_id = ? AND name = ? COLLATE NOCASE", userID, tagName).Scan(&tagID)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				// Create the tag if it doesn't exist
-				res, err := tx.Exec("INSERT INTO tags (user_id, name, description, color) VALUES (?, ?, '', '')", userID, tagName)
+				// Create the tag if it doesn't exist with default color
+				res, err := tx.Exec("INSERT INTO tags (user_id, name, description, color) VALUES (?, ?, '', ?)", userID, tagName, defaultTagColor)
 				if err != nil {
 					return fmt.Errorf("failed to create tag: %w", err)
 				}

@@ -41,6 +41,11 @@ func main() {
 	// Initialize the database connection and tables
 	initDB("passwords.db")
 
+	// Update any existing tags with empty colors to use the default color
+	if err := updateEmptyTagColors(); err != nil {
+		log.Printf("Warning: Failed to update empty tag colors: %v", err)
+	}
+
 	// Start cleanup routines
 	startCleanupRoutines()
 
@@ -49,6 +54,7 @@ func main() {
 	// Public routes (with security headers)
 	mux.HandleFunc("/", securityHeaders(loginHandler))
 	mux.HandleFunc("/login", securityHeaders(loginHandler))
+	mux.HandleFunc("/api/rate-limit-check", securityHeaders(rateLimitCheckHandler))
 	mux.HandleFunc("/test", securityHeaders(testHandler))
 
 	// Protected routes (require authentication) - auth middleware already includes security headers
