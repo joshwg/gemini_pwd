@@ -38,8 +38,8 @@ func startCleanupRoutines() {
 }
 
 func main() {
-	// Initialize the database connection and tables
-	initDB("passwords.db")
+	// Initialize the database connection and tables in parent directory
+	initDB("../passwords.db")
 
 	// Update any existing tags with empty colors to use the default color
 	if err := updateEmptyTagColors(); err != nil {
@@ -87,7 +87,7 @@ func main() {
 	// Start the server
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "7000"
 	}
 	log.Printf("Starting server on :%s", port)
 	log.Println("Security features enabled:")

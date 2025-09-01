@@ -1,6 +1,6 @@
-# Password Manager Deployment Guide
+# Gemini PWD Deployment Guide
 
-This guide will help you deploy the Password Manager application to a Linux server using Apache2 as a reverse proxy and systemd for service management.
+This guide will help you deploy the Gemini Password Manager application to a Linux server using Apache2 as a reverse proxy and systemd for service management.
 
 ## Prerequisites
 
@@ -13,11 +13,11 @@ This guide will help you deploy the Password Manager application to a Linux serv
 
 The deployment package includes:
 
-- `password-manager` - The compiled Go binary
+- `gemini_pwd` - The compiled Go binary
 - `templates/` - HTML templates directory
 - `create_base_db.sql` - Database initialization script
-- `password-manager.service` - Systemd service configuration
-- `apache-password-manager.conf` - Apache virtual host configuration
+- `gemini_pwd.service` - Systemd service configuration
+- `apache-gemini_pwd.conf` - Apache virtual host configuration
 - `deploy.sh` - Automated deployment script
 
 ## Quick Deployment
@@ -40,7 +40,7 @@ Copy the generated tar.gz file to your server:
 
 ```bash
 # Example using scp
-scp deploy/password-manager-*.tar.gz user@your-server:/tmp/
+scp deploy/gemini_pwd-*.tar.gz user@your-server:/tmp/
 ```
 
 ### Step 3: Deploy on Server
@@ -50,8 +50,8 @@ On your Linux server:
 ```bash
 # Extract the deployment package
 cd /tmp
-tar -xzf password-manager-*.tar.gz
-mv package password-manager
+tar -xzf gemini_pwd-*.tar.gz
+mv package gemini_pwd
 
 # Run the deployment script
 cd /path/to/deploy/files
@@ -79,44 +79,44 @@ sudo a2enmod ssl proxy proxy_http headers deflate rewrite
 ### 3. Create Application User
 
 ```bash
-sudo useradd --system --shell /bin/false --home-dir /opt/password-manager --create-home passwordmgr
+sudo useradd --system --shell /bin/false --home-dir /opt/gemini_pwd --create-home geminipwd
 ```
 
 ### 4. Install Application
 
 ```bash
 # Create directory and copy files
-sudo mkdir -p /opt/password-manager
-sudo cp password-manager /opt/password-manager/
-sudo cp -r templates /opt/password-manager/
-sudo cp create_base_db.sql /opt/password-manager/
+sudo mkdir -p /opt/gemini_pwd
+sudo cp gemini_pwd /opt/gemini_pwd/
+sudo cp -r templates /opt/gemini_pwd/
+sudo cp create_base_db.sql /opt/gemini_pwd/
 
 # Set permissions
-sudo chown -R passwordmgr:passwordmgr /opt/password-manager
-sudo chmod +x /opt/password-manager/password-manager
+sudo chown -R geminipwd:geminipwd /opt/gemini_pwd
+sudo chmod +x /opt/gemini_pwd/gemini_pwd
 ```
 
 ### 5. Install Systemd Service
 
 ```bash
-sudo cp password-manager.service /etc/systemd/system/
+sudo cp gemini_pwd.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable password-manager
-sudo systemctl start password-manager
+sudo systemctl enable gemini_pwd
+sudo systemctl start gemini_pwd
 ```
 
 ### 6. Configure Apache
 
 ```bash
 # Copy Apache configuration
-sudo cp apache-password-manager.conf /etc/apache2/sites-available/password-manager.conf
+sudo cp apache-gemini_pwd.conf /etc/apache2/sites-available/gemini_pwd.conf
 
 # Edit the configuration to update your domain name
-sudo nano /etc/apache2/sites-available/password-manager.conf
+sudo nano /etc/apache2/sites-available/gemini_pwd.conf
 
 # Enable the site
 sudo a2dissite 000-default
-sudo a2ensite password-manager
+sudo a2ensite gemini_pwd
 sudo systemctl reload apache2
 ```
 
@@ -145,7 +145,7 @@ sudo certbot renew --dry-run
 
 ### Using Custom Certificates
 
-Edit `/etc/apache2/sites-available/password-manager.conf` and update the SSL certificate paths:
+Edit `/etc/apache2/sites-available/gemini_pwd.conf` and update the SSL certificate paths:
 
 ```apache
 SSLCertificateFile /path/to/your/certificate.crt
@@ -158,7 +158,7 @@ SSLCertificateKeyFile /path/to/your/private.key
 
 The application uses environment variables:
 
-- `PORT` - Port to run on (default: 8081 for deployment)
+- `PORT` - Port to run on (default: 7000 for deployment)
 - `GIN_MODE` - Set to "release" for production
 
 These are set in the systemd service file.
@@ -181,23 +181,23 @@ The deployment includes:
 
 ```bash
 # Start the service
-sudo systemctl start password-manager
+sudo systemctl start gemini_pwd
 
 # Stop the service
-sudo systemctl stop password-manager
+sudo systemctl stop gemini_pwd
 
 # Restart the service
-sudo systemctl restart password-manager
+sudo systemctl restart gemini_pwd
 
 # Check status
-sudo systemctl status password-manager
+sudo systemctl status gemini_pwd
 
 # View logs
-sudo journalctl -u password-manager -f
+sudo journalctl -u gemini_pwd -f
 
 # View Apache logs
-sudo tail -f /var/log/apache2/password-manager_error.log
-sudo tail -f /var/log/apache2/password-manager_access.log
+sudo tail -f /var/log/apache2/gemini_pwd_error.log
+sudo tail -f /var/log/apache2/gemini_pwd_access.log
 ```
 
 ## Backup Strategy
@@ -206,19 +206,19 @@ sudo tail -f /var/log/apache2/password-manager_access.log
 
 ```bash
 # Create backup script
-sudo nano /opt/password-manager/backup.sh
+sudo nano /opt/gemini_pwd/backup.sh
 
 #!/bin/bash
 DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR="/opt/password-manager/backups"
+BACKUP_DIR="/opt/gemini_pwd/backups"
 mkdir -p "$BACKUP_DIR"
-cp /opt/password-manager/passwords.db "$BACKUP_DIR/passwords_$DATE.db"
+cp /opt/passwords.db "$BACKUP_DIR/passwords_$DATE.db"
 find "$BACKUP_DIR" -name "passwords_*.db" -mtime +30 -delete
 
 # Make executable and add to cron
-sudo chmod +x /opt/password-manager/backup.sh
+sudo chmod +x /opt/gemini_pwd/backup.sh
 sudo crontab -e
-# Add: 0 2 * * * /opt/password-manager/backup.sh
+# Add: 0 2 * * * /opt/gemini_pwd/backup.sh
 ```
 
 ## Troubleshooting
@@ -227,8 +227,8 @@ sudo crontab -e
 
 ```bash
 # Check service status and logs
-sudo systemctl status password-manager
-sudo journalctl -u password-manager -n 50
+sudo systemctl status gemini_pwd
+sudo journalctl -u gemini_pwd -n 50
 
 # Common issues:
 # - Port already in use
@@ -253,10 +253,10 @@ sudo tail -f /var/log/apache2/error.log
 
 ```bash
 # Check database permissions
-ls -la /opt/password-manager/passwords.db
+ls -la /opt/passwords.db
 
-# Ensure the passwordmgr user can read/write
-sudo chown passwordmgr:passwordmgr /opt/password-manager/passwords.db
+# Ensure the geminipwd user can read/write
+sudo chown geminipwd:geminipwd /opt/passwords.db
 ```
 
 ## Monitoring
@@ -265,10 +265,10 @@ sudo chown passwordmgr:passwordmgr /opt/password-manager/passwords.db
 
 ```bash
 # Real-time application logs
-sudo journalctl -u password-manager -f
+sudo journalctl -u gemini_pwd -f
 
 # Real-time Apache logs
-sudo tail -f /var/log/apache2/password-manager_access.log
+sudo tail -f /var/log/apache2/gemini_pwd_access.log
 ```
 
 ### Performance Monitoring
@@ -293,9 +293,9 @@ Consider installing monitoring tools like:
 ## Updating the Application
 
 1. Build new version using `build-for-deployment.sh`
-2. Stop the service: `sudo systemctl stop password-manager`
-3. Backup the database: `cp /opt/password-manager/passwords.db /tmp/`
-4. Replace the binary: `sudo cp password-manager /opt/password-manager/`
-5. Update templates if needed: `sudo cp -r templates /opt/password-manager/`
-6. Set permissions: `sudo chown passwordmgr:passwordmgr /opt/password-manager/password-manager`
-7. Start the service: `sudo systemctl start password-manager`
+2. Stop the service: `sudo systemctl stop gemini_pwd`
+3. Backup the database: `cp /opt/passwords.db /tmp/`
+4. Replace the binary: `sudo cp gemini_pwd /opt/gemini_pwd/`
+5. Update templates if needed: `sudo cp -r templates /opt/gemini_pwd/`
+6. Set permissions: `sudo chown geminipwd:geminipwd /opt/gemini_pwd/gemini_pwd`
+7. Start the service: `sudo systemctl start gemini_pwd`

@@ -5,14 +5,14 @@
 
 set -e
 
-echo "=== Password Manager Deployment Script ==="
+echo "=== Gemini Password Manager Deployment Script ==="
 
 # Configuration
-APP_NAME="password-manager"
-APP_USER="passwordmgr"
-APP_DIR="/opt/password-manager"
-SERVICE_FILE="/etc/systemd/system/password-manager.service"
-APACHE_SITE_FILE="/etc/apache2/sites-available/password-manager.conf"
+APP_NAME="gemini_pwd"
+APP_USER="geminipwd"
+APP_DIR="/opt/gemini_pwd"
+SERVICE_FILE="/etc/systemd/system/gemini_pwd.service"
+APACHE_SITE_FILE="/etc/apache2/sites-available/gemini_pwd.conf"
 
 # Colors for output
 RED='\033[0;31m'
@@ -72,28 +72,31 @@ mkdir -p "$APP_DIR"
 chown "$APP_USER:$APP_USER" "$APP_DIR"
 chmod 755 "$APP_DIR"
 
-# 6. Copy application files (assumes you've already copied them to /tmp/password-manager)
-if [ -d "/tmp/password-manager" ]; then
+# Ensure the parent directory (/opt) is writable for database
+chown "$APP_USER:$APP_USER" /opt
+
+# 6. Copy application files (assumes you've already copied them to /tmp/gemini_pwd)
+if [ -d "/tmp/gemini_pwd" ]; then
     print_status "Copying application files..."
-    cp -r /tmp/password-manager/* "$APP_DIR/"
+    cp -r /tmp/gemini_pwd/* "$APP_DIR/"
     chown -R "$APP_USER:$APP_USER" "$APP_DIR"
-    chmod +x "$APP_DIR/password-manager"
+    chmod +x "$APP_DIR/gemini_pwd"
     # Ensure static files have correct permissions
     if [ -d "$APP_DIR/static" ]; then
         chmod -R 644 "$APP_DIR/static"
         chmod 755 "$APP_DIR/static"
     fi
 else
-    print_warning "Application files not found in /tmp/password-manager"
+    print_warning "Application files not found in /tmp/gemini_pwd"
     print_warning "Please copy your application files to $APP_DIR manually"
 fi
 
 # 7. Install systemd service
 print_status "Installing systemd service..."
-if [ -f "password-manager.service" ]; then
-    cp password-manager.service "$SERVICE_FILE"
+if [ -f "gemini_pwd.service" ]; then
+    cp gemini_pwd.service "$SERVICE_FILE"
     systemctl daemon-reload
-    systemctl enable password-manager
+    systemctl enable gemini_pwd
     print_status "Service installed and enabled"
 else
     print_error "Service file not found!"
@@ -101,12 +104,12 @@ fi
 
 # 8. Configure Apache
 print_status "Configuring Apache..."
-if [ -f "apache-password-manager.conf" ]; then
-    cp apache-password-manager.conf "$APACHE_SITE_FILE"
+if [ -f "apache-gemini_pwd.conf" ]; then
+    cp apache-gemini_pwd.conf "$APACHE_SITE_FILE"
     
     # Disable default site and enable our site
     a2dissite 000-default
-    a2ensite password-manager
+    a2ensite gemini_pwd
     
     print_status "Apache configured"
 else
@@ -149,12 +152,12 @@ systemctl restart fail2ban
 
 # 11. Start services
 print_status "Starting services..."
-systemctl start password-manager
+systemctl start gemini_pwd
 systemctl reload apache2
 
 # 12. Check service status
 print_status "Checking service status..."
-systemctl is-active --quiet password-manager && print_status "Password Manager service is running" || print_error "Password Manager service failed to start"
+systemctl is-active --quiet gemini_pwd && print_status "Gemini PWD service is running" || print_error "Gemini PWD service failed to start"
 systemctl is-active --quiet apache2 && print_status "Apache2 service is running" || print_error "Apache2 service failed to start"
 
 print_status "Deployment completed!"
@@ -163,12 +166,12 @@ print_warning "1. Configure SSL certificates (Let's Encrypt recommended)"
 print_warning "2. Update the domain name in Apache configuration"
 print_warning "3. Review and adjust firewall rules as needed"
 print_warning "4. Set up regular backups for the database"
-print_warning "5. Monitor logs: journalctl -u password-manager -f"
+print_warning "5. Monitor logs: journalctl -u gemini_pwd -f"
 
 echo ""
 print_status "Service management commands:"
-echo "  Start:   sudo systemctl start password-manager"
-echo "  Stop:    sudo systemctl stop password-manager"
-echo "  Restart: sudo systemctl restart password-manager"
-echo "  Status:  sudo systemctl status password-manager"
-echo "  Logs:    sudo journalctl -u password-manager -f"
+echo "  Start:   sudo systemctl start gemini_pwd"
+echo "  Stop:    sudo systemctl stop gemini_pwd"
+echo "  Restart: sudo systemctl restart gemini_pwd"
+echo "  Status:  sudo systemctl status gemini_pwd"
+echo "  Logs:    sudo journalctl -u gemini_pwd -f"

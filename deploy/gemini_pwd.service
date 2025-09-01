@@ -1,0 +1,31 @@
+[Unit]
+Description=Gemini Password Manager Web Application
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=geminipwd
+Group=geminipwd
+WorkingDirectory=/opt/gemini_pwd
+ExecStart=/opt/gemini_pwd/gemini_pwd
+Environment=PORT=7000
+Environment=GIN_MODE=release
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/gemini_pwd
+ReadWritePaths=/opt
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gemini_pwd
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,6 @@
 // go.mod
-module password-manager
+module gemini_pwd
+
 
 go 1.21.0
 

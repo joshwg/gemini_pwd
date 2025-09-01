@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Build script for password manager deployment
+# Build script for gemini_pwd deployment
 # This script builds the application for Linux deployment
 
 set -e
 
-echo "=== Building Password Manager for Deployment ==="
+echo "=== Building Gemini PWD for Deployment ==="
 
 # Check if we're in the right directory
 if [ ! -f "main.go" ]; then
@@ -18,7 +18,7 @@ mkdir -p deploy/package
 
 # Build for Linux (assuming deployment on Ubuntu/Debian)
 echo "Building for Linux amd64..."
-GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o deploy/package/password-manager .
+GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o deploy/package/gemini_pwd .
 
 # Copy required files
 echo "Copying application files..."
@@ -30,13 +30,13 @@ cp README.md deploy/package/
 # Create a deployment package
 echo "Creating deployment package..."
 cd deploy
-tar -czf password-manager-$(date +%Y%m%d-%H%M%S).tar.gz package/
+tar -czf gemini_pwd-$(date +%Y%m%d-%H%M%S).tar.gz package/
 
 echo "Build completed!"
 echo "Deployment package created in deploy/ directory"
 echo ""
 echo "To deploy:"
 echo "1. Copy the tar.gz file to your server"
-echo "2. Extract it: tar -xzf password-manager-*.tar.gz"
-echo "3. Move contents to /tmp/password-manager/"
+echo "2. Extract it: tar -xzf gemini_pwd-*.tar.gz"
+echo "3. Move contents to /tmp/gemini_pwd/"
 echo "4. Run the deployment script as root"
