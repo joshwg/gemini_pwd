@@ -4,40 +4,28 @@
 {{define "content"}}
     <!-- Password Entries List -->
     <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-4">
             <h2 class="text-2xl font-semibold">Your Passwords</h2>
-            <div class="flex items-center">
-                <input type="text" id="searchPassword" placeholder="Search passwords..." class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline mr-4">
-                <button id="createPasswordBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" title="Create a new password entry">
+            <div class="flex items-center flex-wrap gap-2">
+                <input type="text" id="searchPassword" placeholder="Search passwords..." class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-full sm:w-auto">
+                <button id="createPasswordBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline whitespace-nowrap" title="Create a new password entry">
                     <i class="fas fa-plus mr-2"></i>New Password
                 </button>
             </div>
         </div>
-        <table class="min-w-full bg-white rounded-lg overflow-hidden">
-            <thead class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
-                <tr>
-                    <th class="py-3 px-6 text-left">Site</th>
-                    <th class="py-3 px-6 text-left">Username</th>
-                    <th class="py-3 px-6 text-left">Password</th>
-                    <th class="py-3 px-6 text-left">Notes</th>
-                    <th class="py-3 px-6 text-left">Tags</th>
-                    <th class="py-3 px-6 text-center">Actions</th>
-                </tr>
-            </thead>
-            <tbody id="passwordTableBody" class="text-gray-600 text-sm font-light">
-                <!-- Passwords will be populated here by JavaScript -->
-            </tbody>
-        </table>
+        <div id="passwordCardContainer" class="space-y-4">
+            <!-- Password cards will be populated here by JavaScript -->
+        </div>
     </div>
     
 </main>
 
 <!-- Password Modal (Create/Edit) -->
 <div id="passwordModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
-    <div class="relative top-20 mx-auto p-5 border w-full md:w-1/2 shadow-lg rounded-md bg-white">
+    <div class="relative top-4 sm:top-20 mx-auto p-3 sm:p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
         <div class="mt-3 text-center">
             <h3 class="text-lg leading-6 font-medium text-gray-900" id="passwordModalTitle"></h3>
-            <div class="mt-2 px-7 py-3">
+            <div class="mt-2 px-3 sm:px-7 py-3">
                 <form id="passwordForm">
                     <input type="hidden" id="passwordID" name="id">
                     <div class="mb-4">
@@ -63,16 +51,16 @@
                         <textarea id="passwordNotes" name="notes" rows="6" maxlength="4096" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline resize-vertical"></textarea>
                         <div id="passwordNotesValidation" class="text-sm mt-1 hidden"></div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
                         <div>
                             <label class="block text-gray-700 text-sm font-bold mb-2 text-left">Available Tags</label>
-                            <div id="tagList" class="flex flex-wrap items-start content-start gap-1 p-2 border rounded-md bg-gray-300 h-32 overflow-y-auto">
+                            <div id="tagList" class="flex flex-wrap items-start content-start gap-1 p-2 border rounded-md bg-gray-300 h-48 overflow-y-auto">
                                 <!-- Available tags will be populated here -->
                             </div>
                         </div>
                         <div>
                             <label class="block text-gray-700 text-sm font-bold mb-2 text-left">Password Tags</label>
-                            <div id="passwordTagsContainer" class="flex flex-wrap items-start content-start gap-1 p-2 border rounded-md bg-gray-300 h-32 overflow-y-auto min-h-[40px]">
+                            <div id="passwordTagsContainer" class="flex flex-wrap items-start content-start gap-1 p-2 border rounded-md bg-gray-300 h-48 overflow-y-auto min-h-[40px]">
                                 <!-- Tags associated with the password will be dropped here -->
                             </div>
                         </div>
@@ -115,6 +103,67 @@
             opacity: 0.8;
         }
     }
+    
+    /* Responsive adjustments for narrow screens */
+    @media (max-width: 640px) {
+        /* Reduce font sizes on very small screens */
+        .text-2xl {
+            font-size: 1.25rem !important;
+        }
+        
+        /* Make cards more compact on mobile */
+        .grid-cols-12 {
+            display: block !important;
+        }
+        
+        .grid-cols-12 > div {
+            margin-bottom: 1rem;
+        }
+        
+        .grid-cols-12 > div:last-child {
+            margin-bottom: 0;
+        }
+        
+        /* Stack password fields vertically on mobile */
+        .password-display {
+            min-width: 0 !important;
+            width: 100% !important;
+        }
+        
+        /* Make action buttons full width on mobile */
+        .col-span-12.sm\\:col-span-2 {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+        
+        /* Reduce card padding on mobile */
+        #passwordCardContainer .p-4 {
+            padding: 1rem !important;
+        }
+        
+        /* Make tags section full width on mobile */
+        .lg\\:grid-cols-2 {
+            grid-template-columns: 1fr !important;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        /* Extra small screens */
+        .password-display {
+            font-size: 0.75rem !important;
+        }
+        
+        /* Even more compact cards */
+        #passwordCardContainer .p-4 {
+            padding: 0.75rem !important;
+        }
+        
+        /* Smaller action buttons */
+        .edit-password-btn, .delete-password-btn {
+            padding: 0.5rem !important;
+        }
+    }
 </style>
 
 <script>
@@ -127,7 +176,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        const passwordTableBody = document.getElementById('passwordTableBody');
+        const passwordCardContainer = document.getElementById('passwordCardContainer');
         const searchPasswordInput = document.getElementById('searchPassword');
         const createPasswordBtn = document.getElementById('createPasswordBtn');
         const passwordModal = document.getElementById('passwordModal');
@@ -700,68 +749,89 @@
         }
 
         function renderPasswords(passwords) {
-            passwordTableBody.innerHTML = '';
+            passwordCardContainer.innerHTML = '';
             
             // Handle empty state
             if (passwords.length === 0) {
-                const emptyRow = document.createElement('tr');
-                emptyRow.innerHTML = 
-                    '<td colspan="6" class="py-8 px-6 text-center text-gray-500">' +
-                        '<div class="flex flex-col items-center">' +
-                            '<i class="fas fa-key text-3xl text-gray-300 mb-2"></i>' +
-                            '<p class="text-lg font-medium">No passwords found</p>' +
-                            '<p class="text-sm">Add your first password to get started</p>' +
-                        '</div>' +
-                    '</td>';
-                passwordTableBody.appendChild(emptyRow);
+                const emptyCard = document.createElement('div');
+                emptyCard.className = 'bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center';
+                emptyCard.innerHTML = 
+                    '<div class="flex flex-col items-center">' +
+                        '<i class="fas fa-key text-4xl text-gray-300 mb-4"></i>' +
+                        '<p class="text-lg font-medium text-gray-500 mb-2">No passwords found</p>' +
+                        '<p class="text-sm text-gray-400">Add your first password to get started</p>' +
+                    '</div>';
+                passwordCardContainer.appendChild(emptyCard);
                 return;
             }
             
             passwords.forEach(p => {
-                const row = document.createElement('tr');
-                row.className = 'border-b border-gray-200 hover:bg-gray-100';
+                // Create main card container
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200';
+                card.id = 'password-card-' + p.id;
                 
+                // Generate tags HTML
                 const tagsHTML = p.tags.map(tag => {
                     const tagColor = getTagColor(tag.color);
                     const textColor = getTextColor(tagColor);
                     const borderStyle = getBorderStyle(tagColor);
-                    return '<span class="tag-item text-xs font-semibold inline-block py-0.5 px-3 rounded border last:mr-0 mr-1 break-all" style="background-color: ' + tagColor + '; color: ' + textColor + '; border: ' + borderStyle + ';">' + tag.name + '</span>';
+                    return '<span class="tag-item text-xs font-semibold inline-block py-0.5 px-2 rounded border mr-1 mb-1" style="background-color: ' + tagColor + '; color: ' + textColor + '; border: ' + borderStyle + ';">' + tag.name + '</span>';
                 }).join('');
                 
                 // Password display area with show/hide and copy functionality
                 const passwordHTML = 
                     '<div class="flex items-center gap-2">' +
-                        '<input type="password" id="password-' + p.id + '" class="password-display w-32 py-1 px-2 text-sm border rounded bg-gray-50" placeholder="••••••••" readonly>' +
-                        '<button class="show-password-btn w-4 transform hover:text-blue-500 hover:scale-110" data-id="' + p.id + '" title="Show/Hide password"><i class="fas fa-eye"></i></button>' +
-                        '<button class="copy-password-btn w-4 transform hover:text-green-500 hover:scale-110" data-id="' + p.id + '" title="Copy password to clipboard"><i class="fas fa-copy"></i></button>' +
+                        '<input type="password" id="password-' + p.id + '" class="password-display flex-1 py-1 px-2 text-sm border rounded bg-gray-50" placeholder="••••••••" readonly>' +
+                        '<button class="show-password-btn p-1 transform hover:text-blue-500 hover:scale-110" data-id="' + p.id + '" title="Show/Hide password"><i class="fas fa-eye"></i></button>' +
+                        '<button class="copy-password-btn p-1 transform hover:text-green-500 hover:scale-110" data-id="' + p.id + '" title="Copy password to clipboard"><i class="fas fa-copy"></i></button>' +
                     '</div>';
                 
-                // Notes display area with show/hide functionality
-                const notesHTML = p.notes && p.notes.trim() ? 
-                    '<div class="flex items-center gap-2">' +
-                        '<div class="notes-display w-40 max-h-16 overflow-hidden">' +
-                            '<div id="notes-' + p.id + '" class="text-sm text-gray-600 hidden">' + 
-                                '<div class="p-2 bg-gray-50 rounded border max-h-14 overflow-y-auto">' + (p.notes.length > 100 ? p.notes.substring(0, 100) + '...' : p.notes) + '</div>' +
+                // Card HTML structure
+                card.innerHTML = 
+                    '<div class="p-4">' +
+                        '<!-- First Row: Site, Username, Password, Actions -->' +
+                        '<div class="grid grid-cols-12 gap-4 items-center mb-3">' +
+                            '<div class="col-span-12 sm:col-span-3">' +
+                                '<label class="text-xs text-gray-500 uppercase tracking-wide">Site</label>' +
+                                '<div class="font-medium text-gray-900 break-all">' + p.site + '</div>' +
                             '</div>' +
-                            '<div class="text-sm text-gray-400">Click to view</div>' +
+                            '<div class="col-span-12 sm:col-span-3">' +
+                                '<label class="text-xs text-gray-500 uppercase tracking-wide">Username</label>' +
+                                '<div class="font-medium text-gray-700 break-all">' + p.username + '</div>' +
+                            '</div>' +
+                            '<div class="col-span-12 sm:col-span-4">' +
+                                '<label class="text-xs text-gray-500 uppercase tracking-wide">Password</label>' +
+                                '<div class="mt-1">' + passwordHTML + '</div>' +
+                            '</div>' +
+                            '<div class="col-span-12 sm:col-span-2 flex justify-end gap-2">' +
+                                '<button class="edit-password-btn p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors" data-id="' + p.id + '" title="Edit password"><i class="fas fa-edit"></i></button>' +
+                                '<button class="delete-password-btn p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded transition-colors" data-id="' + p.id + '" title="Delete password"><i class="fas fa-trash-alt"></i></button>' +
+                            '</div>' +
                         '</div>' +
-                        '<button class="show-notes-btn w-4 transform hover:text-blue-500 hover:scale-110" data-id="' + p.id + '" title="Show/Hide notes"><i class="fas fa-eye"></i></button>' +
-                    '</div>' :
-                    '<span class="text-gray-400 text-sm">No notes</span>';
+                        '<!-- Second Row: Tags and Notes -->' +
+                        '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-3 border-t border-gray-100">' +
+                            '<div class="tags-container">' +
+                                '<div class="flex items-center mb-2">' +
+                                    '<span class="text-xs text-gray-500 uppercase tracking-wide">Tags</span>' +
+                                '</div>' +
+                                '<div class="flex flex-wrap gap-1">' + tagsHTML + '</div>' +
+                            '</div>' +
+                            '<div class="notes-container">' +
+                                '<div class="flex items-center mb-2">' +
+                                    '<span class="text-xs text-gray-500 uppercase tracking-wide mr-3">Notes</span>' +
+                                    '<button class="show-notes-btn text-xs text-blue-500 hover:text-blue-700 flex items-center" data-id="' + p.id + '" title="Show/Hide notes">' +
+                                        '<i class="fas fa-eye mr-1"></i>Show' +
+                                    '</button>' +
+                                '</div>' +
+                                '<div class="notes-content hidden" id="notes-container-' + p.id + '">' +
+                                    '<textarea id="notes-content-' + p.id + '" class="w-full h-20 p-2 border border-gray-300 rounded text-sm text-gray-700 bg-white resize-vertical" readonly placeholder="Loading notes..."></textarea>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
                 
-                row.innerHTML = 
-                    '<td class="py-3 px-6 text-left whitespace-nowrap">' + p.site + '</td>' +
-                    '<td class="py-3 px-6 text-left">' + p.username + '</td>' +
-                    '<td class="py-3 px-6 text-left">' + passwordHTML + '</td>' +
-                    '<td class="py-3 px-6 text-left">' + notesHTML + '</td>' +
-                    '<td class="py-3 px-6 text-left"><div class="flex flex-wrap gap-1">' + tagsHTML + '</div></td>' +
-                    '<td class="py-3 px-6 text-center">' +
-                        '<div class="flex item-center justify-center">' +
-                            '<button class="edit-password-btn w-4 mr-2 transform hover:text-blue-500 hover:scale-110" data-id="' + p.id + '" title="Edit password"><i class="fas fa-edit"></i></button>' +
-                            '<button class="delete-password-btn w-4 mr-2 transform hover:text-red-500 hover:scale-110" data-id="' + p.id + '" title="Delete password"><i class="fas fa-trash-alt"></i></button>' +
-                        '</div>' +
-                    '</td>';
-                passwordTableBody.appendChild(row);
+                passwordCardContainer.appendChild(card);
             });
         }
 
@@ -856,23 +926,38 @@
             }
         }
 
-        function showHideNotes(id) {
-            const notesDiv = document.getElementById('notes-' + id);
-            const placeholderDiv = notesDiv.parentElement.querySelector('.text-gray-400');
-            const eyeIcon = document.querySelector('.show-notes-btn[data-id="' + id + '"] i');
+        async function showHideNotes(id) {
+            const notesContainer = document.getElementById('notes-container-' + id);
+            const notesContent = document.getElementById('notes-content-' + id);
+            const showButton = document.querySelector('.show-notes-btn[data-id="' + id + '"]');
             
-            if (notesDiv.classList.contains('hidden')) {
-                // Show notes
-                notesDiv.classList.remove('hidden');
-                placeholderDiv.style.display = 'none';
-                eyeIcon.classList.remove('fa-eye');
-                eyeIcon.classList.add('fa-eye-slash');
+            if (notesContainer.classList.contains('hidden')) {
+                // Show notes - fetch them if not already loaded
+                if (notesContent.placeholder === 'Loading notes...') {
+                    notesContent.value = 'Loading...';
+                    try {
+                        const response = await fetch(API_ORIGIN + '/api/passwords?id=' + id);
+                        if (response.ok) {
+                            const password = await response.json();
+                            const notesText = password.notes && password.notes.trim() ? password.notes : 'No notes available';
+                            notesContent.value = notesText;
+                            notesContent.placeholder = '';
+                        } else {
+                            notesContent.value = 'Failed to load notes';
+                        }
+                    } catch (error) {
+                        notesContent.value = 'Error loading notes';
+                    }
+                }
+                
+                // Show the notes container
+                notesContainer.classList.remove('hidden');
+                showButton.innerHTML = '<i class="fas fa-eye-slash mr-1"></i>Hide';
+                
             } else {
-                // Hide notes
-                notesDiv.classList.add('hidden');
-                placeholderDiv.style.display = 'block';
-                eyeIcon.classList.remove('fa-eye-slash');
-                eyeIcon.classList.add('fa-eye');
+                // Hide notes container
+                notesContainer.classList.add('hidden');
+                showButton.innerHTML = '<i class="fas fa-eye mr-1"></i>Show';
             }
         }
     });
