@@ -2,21 +2,39 @@
 {{define "title"}}Dashboard{{end}}
 
 {{define "content"}}
-    <!-- Password Entries List -->
-    <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-        <div class="flex items-center justify-between mb-4 flex-wrap gap-4">
-            <h2 class="text-2xl font-semibold">Your Passwords</h2>
-            <div class="flex items-center flex-wrap gap-2">
-                <input type="text" id="searchPassword" placeholder="Search passwords..." class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-full sm:w-auto">
-                <button id="createPasswordBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline whitespace-nowrap" title="Create a new password entry">
-                    <i class="fas fa-plus mr-2"></i>New Password
-                </button>
-            </div>
+<div class="flex gap-6">
+    <!-- Left Sidebar - Tag Filter -->
+    <div class="w-1/4 max-w-xs bg-white p-4 rounded-lg shadow-md h-fit" style="max-width: 280px;">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Filter by Tags</h3>
+            <button id="clearTagFilters" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded focus:outline-none focus:shadow-outline">
+                Clear
+            </button>
         </div>
-        <div id="passwordCardContainer" class="space-y-4">
-            <!-- Password cards will be populated here by JavaScript -->
+        <div id="tagFilterList" class="space-y-1 max-h-96 overflow-y-auto">
+            <!-- Tag filter list will be populated here -->
         </div>
     </div>
+
+    <!-- Main Content Area -->
+    <div class="flex-1">
+        <!-- Password Entries List -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-4">
+                <h2 class="text-2xl font-semibold">Your Passwords</h2>
+                <div class="flex items-center flex-wrap gap-2">
+                    <input type="text" id="searchPassword" placeholder="Site or username..." class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-full sm:w-auto">
+                    <button id="createPasswordBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline whitespace-nowrap" title="Create a new password entry">
+                        <i class="fas fa-plus mr-2"></i>New Password
+                    </button>
+                </div>
+            </div>
+            <div id="passwordCardContainer" class="space-y-4">
+                <!-- Password cards will be populated here by JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
     
 </main>
 
@@ -111,6 +129,15 @@
             font-size: 1.25rem !important;
         }
         
+        /* Stack sidebar and main content vertically on mobile */
+        .flex.gap-6 {
+            flex-direction: column !important;
+        }
+        
+        .w-1\/4 {
+            width: 100% !important;
+        }
+        
         /* Make cards more compact on mobile */
         .grid-cols-12 {
             display: block !important;
@@ -189,6 +216,10 @@
         const passwordNotes = document.getElementById('passwordNotes');
         const passwordTagsContainer = document.getElementById('passwordTagsContainer');
         
+        // Tag filtering elements
+        const tagFilterList = document.getElementById('tagFilterList');
+        const clearTagFilters = document.getElementById('clearTagFilters');
+        
         // Password validation elements
         const passwordSiteValidation = document.getElementById('passwordSiteValidation');
         const passwordUsernameValidation = document.getElementById('passwordUsernameValidation');
@@ -248,14 +279,47 @@
             tags.forEach(tag => container.appendChild(tag));
         }
         
+        // Tag filtering state
+        let selectedTagFilterIds = new Set();
+        let allPasswords = []; // Store all passwords for client-side filtering
+        
         // Fetch and render passwords and tags on page load
         fetchPasswords();
         fetchTags();
 
         // Search functionality
         searchPasswordInput.addEventListener('keyup', () => {
-            fetchPasswords(searchPasswordInput.value);
+            applyFilters();
         });
+        
+        // Tag filter functionality
+        clearTagFilters.addEventListener('click', () => {
+            selectedTagFilterIds.clear();
+            renderTagFilterList(allTags); // Re-render to update selection state
+            applyFilters();
+        });
+
+        // Function to apply both text search and tag filters
+        function applyFilters() {
+            const searchQuery = searchPasswordInput.value.toLowerCase().trim();
+            
+            let filteredPasswords = allPasswords.filter(password => {
+                // Text search - check site and username
+                const matchesText = !searchQuery || 
+                    password.site.toLowerCase().includes(searchQuery) ||
+                    password.username.toLowerCase().includes(searchQuery);
+                
+                // Tag filter - all selected tags must be present
+                const matchesTags = selectedTagFilterIds.size === 0 || 
+                    Array.from(selectedTagFilterIds).every(tagId => 
+                        password.tags.some(tag => tag.id.toString() === tagId)
+                    );
+                
+                return matchesText && matchesTags;
+            });
+            
+            renderPasswords(filteredPasswords);
+        }
 
         // Function to check for duplicate passwords via API
         async function checkPasswordDuplicate(site, username, id = null) {
@@ -647,15 +711,16 @@
         }
 
         // Helper functions
-        async function fetchPasswords(query = '') {
+        async function fetchPasswords() {
             try {
-                const response = await fetch(API_ORIGIN + '/api/passwords?q=' + encodeURIComponent(query));
+                const response = await fetch(API_ORIGIN + '/api/passwords');
                 if (!response.ok) {
                     const errorText = await response.text();
                     throw new Error('Failed to fetch passwords: ' + response.status + ' ' + response.statusText + ' - ' + errorText);
                 }
                 const passwords = await response.json() || [];
-                renderPasswords(passwords);
+                allPasswords = passwords;
+                applyFilters(); // Apply current filters instead of rendering directly
             } catch (e) {
                 console.error('Error in fetchPasswords:', e);
                 alert('Could not fetch passwords. See console for details.');
@@ -742,10 +807,68 @@
                 }
                 allTags = await response.json() || [];
                 renderTags(allTags);
+                renderTagFilterList(allTags);
             } catch (e) {
                 console.error('Error in fetchTags:', e);
                 alert('Could not fetch tags. See console for details.');
             }
+        }
+        
+        // Function to render the tag filter list in the sidebar
+        function renderTagFilterList(tags) {
+            tagFilterList.innerHTML = '';
+            
+            if (tags.length === 0) {
+                tagFilterList.innerHTML = '<div class="text-sm text-gray-500 text-center py-4">No tags available</div>';
+                return;
+            }
+            
+            // Sort tags alphabetically
+            const sortedTags = [...tags].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+            
+            sortedTags.forEach(tag => {
+                const tagColor = getTagColor(tag.color);
+                const textColor = getTextColor(tagColor);
+                const isSelected = selectedTagFilterIds.has(tag.id.toString());
+                
+                const tagElement = document.createElement('div');
+                
+                if (isSelected) {
+                    // Selected tags: darker background, white text, thick border
+                    tagElement.className = 'tag-filter-item cursor-pointer text-xs font-bold py-2 px-3 rounded border-2 transition-all shadow-md transform scale-105';
+                    tagElement.style.backgroundColor = '#1e40af'; // Blue-800
+                    tagElement.style.color = '#ffffff';
+                    tagElement.style.borderColor = '#1d4ed8'; // Blue-700
+                    tagElement.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
+                } else {
+                    // Unselected tags: original colors, hover effects
+                    tagElement.className = 'tag-filter-item cursor-pointer text-xs font-semibold py-1 px-2 rounded border transition-all hover:opacity-80 hover:shadow-sm';
+                    tagElement.style.backgroundColor = tagColor;
+                    tagElement.style.color = textColor;
+                    tagElement.style.border = getBorderStyle(tagColor);
+                }
+                
+                tagElement.dataset.tagId = tag.id;
+                tagElement.textContent = tag.name;
+                
+                tagElement.addEventListener('click', () => {
+                    toggleTagFilter(tag.id.toString(), tag.name, tagColor, textColor);
+                });
+                
+                tagFilterList.appendChild(tagElement);
+            });
+        }
+        
+        // Function to toggle a tag filter
+        function toggleTagFilter(tagId, tagName, tagColor, textColor) {
+            if (selectedTagFilterIds.has(tagId)) {
+                selectedTagFilterIds.delete(tagId);
+            } else {
+                selectedTagFilterIds.add(tagId);
+            }
+            
+            renderTagFilterList(allTags); // Re-render to update selection state
+            applyFilters();
         }
 
         function renderPasswords(passwords) {
@@ -804,9 +927,12 @@
                                 '<label class="text-xs text-gray-500 uppercase tracking-wide">Password</label>' +
                                 '<div class="mt-1">' + passwordHTML + '</div>' +
                             '</div>' +
-                            '<div class="col-span-12 sm:col-span-2 flex justify-end gap-2">' +
-                                '<button class="edit-password-btn p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors" data-id="' + p.id + '" title="Edit password"><i class="fas fa-edit"></i></button>' +
-                                '<button class="delete-password-btn p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded transition-colors" data-id="' + p.id + '" title="Delete password"><i class="fas fa-trash-alt"></i></button>' +
+                            '<div class="col-span-12 sm:col-span-2 text-center">' +
+                                '<label class="text-xs text-gray-500 uppercase tracking-wide">Actions</label>' +
+                                '<div class="flex justify-center gap-2 mt-1">' +
+                                    '<button class="edit-password-btn p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors" data-id="' + p.id + '" title="Edit password"><i class="fas fa-edit"></i></button>' +
+                                    '<button class="delete-password-btn p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded transition-colors" data-id="' + p.id + '" title="Delete password"><i class="fas fa-trash-alt"></i></button>' +
+                                '</div>' +
                             '</div>' +
                         '</div>' +
                         '<!-- Second Row: Tags and Notes -->' +

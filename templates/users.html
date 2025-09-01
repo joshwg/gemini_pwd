@@ -25,7 +25,7 @@
             <div class="flex items-center mt-6">
                 <label for="newIsAdmin" class="text-gray-700 mr-2">Admin?</label>
                 <input type="checkbox" id="newIsAdmin" name="isAdmin" class="form-checkbox h-5 w-5 text-blue-600">
-                <button type="submit" id="createUserSubmitBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-auto focus:outline-none focus:shadow-outline">Create User</button>
+                <button type="submit" id="createUserSubmitBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-auto focus:outline-none focus:shadow-outline opacity-50 cursor-not-allowed" disabled>Create User</button>
             </div>
         </form>
     </div>
@@ -97,7 +97,7 @@
                             <div id="confirmPasswordAdminValidation" class="text-sm mt-1 hidden"></div>
                         </div>
                         <div class="mt-4">
-                            <button type="submit" id="changePasswordSubmitBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Change Password</button>
+                            <button type="submit" id="changePasswordSubmitBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline opacity-50 cursor-not-allowed" disabled>Change Password</button>
                             <button type="button" class="close-modal bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancel</button>
                         </div>
                     </form>
@@ -142,6 +142,9 @@
         // Real-time validation for password
         createUserPassword.addEventListener('input', validateCreateUserForm);
         createUserPassword.addEventListener('blur', validateCreateUserForm);
+
+        // Initial validation to set proper button state
+        validateCreateUserForm();
 
         function validateCreateUserForm() {
             const username = newUsername.value.trim();
@@ -432,6 +435,8 @@
             } else if (e.target.closest('.change-password-btn')) {
                 currentUsername = e.target.closest('.change-password-btn').dataset.username;
                 document.getElementById('changePasswordUser').textContent = currentUsername;
+                // Reset form fields
+                changePasswordForm.reset();
                 // Reset validation state when opening modal
                 newPasswordAdmin.classList.remove('border-red-500', 'border-green-500');
                 confirmPasswordAdmin.classList.remove('border-red-500', 'border-green-500');
@@ -441,6 +446,8 @@
                 changePasswordSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 changePasswordSubmitBtn.classList.remove('hover:bg-blue-700');
                 changePasswordModal.classList.remove('hidden');
+                // Run initial validation to set proper button state
+                validateChangePasswordForm();
             }
         });
 
