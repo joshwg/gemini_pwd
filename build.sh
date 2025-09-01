@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# build.sh - Build script for the Gemini Password Manager
+# build.sh - Build script for Gemini PWD
 # Usage: ./build.sh [target] [options]
 # Targets: local, linux, windows, darwin, all, clean
 # Options: --dev (development build), --release (optimized build)

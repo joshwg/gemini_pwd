@@ -1,6 +1,6 @@
 # Build Scripts
 
-This directory contains build scripts for the Gemini Password Manager that support multiple platforms and build configurations.
+This directory contains build scripts for Gemini PWD that support multiple platforms and build configurations.
 
 ## Quick Start
 

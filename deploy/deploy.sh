@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Password Manager Deployment Script
+# Gemini PWD Deployment Script
 # Run this script as root or with sudo
 
 set -e
 
-echo "=== Gemini Password Manager Deployment Script ==="
+echo "=== Gemini PWD Deployment Script ==="
 
 # Configuration
 APP_NAME="gemini_pwd"

@@ -1,4 +1,4 @@
-# Password Manager
+# Gemini PWD
 
 A secure password manager built with Go that provides encrypted storage of passwords with user management and tagging features.
 

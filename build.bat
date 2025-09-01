@@ -1,5 +1,5 @@
 @echo off
-REM build.bat - Build script for the Gemini Password Manager (Windows)
+REM build.bat - Build script for Gemini PWD (Windows)
 REM Usage: build.bat [target] [options]
 REM Targets: local, linux, windows, darwin, all, clean
 REM Options: dev (development build), release (optimized build)

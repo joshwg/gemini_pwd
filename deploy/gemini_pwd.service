@@ -1,5 +1,5 @@
 [Unit]
-Description=Gemini Password Manager Web Application
+Description=Gemini PWD Web Application
 After=network.target
 StartLimitIntervalSec=0
 

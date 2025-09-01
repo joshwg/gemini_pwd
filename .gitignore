@@ -9,8 +9,8 @@ passwords.db-shm
 *.db-shm
 
 # Compiled binaries
-password-manager
-password-manager.exe
+gemini_pwd
+gemini_pwd.exe
 main
 main.exe
 *.exe
@@ -80,3 +80,38 @@ vendor/
 # Test databases
 test.db
 *_test.db
+
+# Deployment artifacts and build packages
+deploy/package/
+deploy/*.tar.gz
+deploy/*.zip
+
+# Compiled binaries for deployment
+gemini_pwd
+gemini_pwd.exe
+
+# Deployment temporary files
+/tmp/gemini_pwd/
+
+# Backup files from deployment
+backups/
+*.db.backup
+passwords_*.db
+
+# Runtime files and locks
+*.pid
+*.lock
+
+# SSL certificates and keys (if stored locally)
+*.pem
+*.key
+*.crt
+*.cert
+
+# Local development overrides
+docker-compose.override.yml
+local.env
+
+# Generated documentation
+docs/build/
+site/

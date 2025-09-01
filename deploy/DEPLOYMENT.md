@@ -1,6 +1,6 @@
 # Gemini PWD Deployment Guide
 
-This guide will help you deploy the Gemini Password Manager application to a Linux server using Apache2 as a reverse proxy and systemd for service management.
+This guide will help you deploy the Gemini PWD application to a Linux server using Apache2 as a reverse proxy and systemd for service management.
 
 ## Prerequisites
 

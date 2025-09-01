@@ -54,6 +54,7 @@ func main() {
 	// Static files (favicon, etc.)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
 		http.ServeFile(w, r, "static/favicon.svg")
 	})
 	mux.HandleFunc("/favicon.svg", func(w http.ResponseWriter, r *http.Request) {

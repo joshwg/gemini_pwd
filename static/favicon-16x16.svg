@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
-  <rect width="16" height="16" fill="#1e40af" rx="2"/>
-  <g fill="#ffffff">
-    <!-- Key icon -->
-    <circle cx="6" cy="6" r="2.5" stroke="#ffffff" stroke-width="0.8" fill="none"/>
-    <path d="m8.5 6 4 4-0.8 0.8L11 10l-0.8 0.8L9.5 10l-0.8-0.8" stroke="#ffffff" stroke-width="0.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="6" cy="6" r="0.8" fill="#ffffff"/>
-  </g>
-</svg>
