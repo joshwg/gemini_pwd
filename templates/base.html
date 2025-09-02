@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{template "title" .}} - Gemini PWD</title>
+    <title>{{template "title" .}} - Password Manager</title>
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -16,7 +16,7 @@
 <body class="bg-gray-100 min-h-screen">
     <div x-data="{ open: false }" @keydown.escape="open = false" class="bg-gray-800 text-white">
         <nav class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <span class="text-xl font-bold">Gemini PWD</span>
+            <span class="text-xl font-bold">Password Manager</span>
             <div class="flex items-center">
                 <a href="/dashboard" class="text-white hover:text-gray-300 mr-4">Dashboard</a>
                 <div class="relative" x-data="{ dropdownOpen: false }">
@@ -510,6 +510,45 @@
                     }
                 });
             }
+
+            // Idle timeout functionality (30 minutes)
+            let idleTimer;
+            let warningTimer;
+            const IDLE_TIME = 30 * 60 * 1000; // 30 minutes in milliseconds
+            const WARNING_TIME = 5 * 60 * 1000; // 5 minutes warning before logout
+            
+            function resetIdleTimer() {
+                clearTimeout(idleTimer);
+                clearTimeout(warningTimer);
+                
+                // Set warning timer (25 minutes)
+                warningTimer = setTimeout(showIdleWarning, IDLE_TIME - WARNING_TIME);
+                
+                // Set logout timer (30 minutes)
+                idleTimer = setTimeout(logoutUser, IDLE_TIME);
+            }
+            
+            function showIdleWarning() {
+                const userConfirmed = confirm('You will be logged out in 5 minutes due to inactivity. Click OK to stay logged in.');
+                if (userConfirmed) {
+                    resetIdleTimer(); // Reset timer if user wants to stay
+                }
+            }
+            
+            function logoutUser() {
+                alert('You have been logged out due to inactivity.');
+                window.location.href = '/logout';
+            }
+            
+            // Track user activity
+            const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+            
+            activityEvents.forEach(event => {
+                document.addEventListener(event, resetIdleTimer, true);
+            });
+            
+            // Initialize idle timer on page load
+            resetIdleTimer();
         });
     </script>
 </body>
