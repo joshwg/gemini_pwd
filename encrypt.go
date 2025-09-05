@@ -7,8 +7,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"gemini_pwd/pkg/logger"
 	"io"
-	"log"
 	"os"
 
 	"golang.org/x/crypto/pbkdf2"
@@ -20,20 +20,19 @@ func init() {
 	keyStr := os.Getenv("PWD_SECRET_KEY")
 	if keyStr == "" {
 		keyStr = "ThisIsASecretKeyYouShouldReplace"
-		log.Printf("⚠️  WARNING: Using default encryption key! Set PWD_SECRET_KEY environment variable in production!")
-		log.Printf("⚠️  WARNING: Default key should NEVER be used in production - generate a secure 32-byte key")
+		logger.Warning("Using default encryption key! Set PWD_SECRET_KEY environment variable in production!")
+		logger.Warning("Default key should NEVER be used in production - generate a secure 32-byte key")
 	} else {
-		log.Printf("✅ Using custom PWD_SECRET_KEY from environment variable")
+		logger.Success("Using custom PWD_SECRET_KEY from environment variable")
 	}
 
 	// AES-256 requires a 32-byte key. We'll panic on startup if the key is not the correct size.
 	if len(keyStr) != 32 {
-		log.Printf("❌ FATAL: Invalid PWD_SECRET_KEY length: must be exactly 32 bytes, but got %d bytes", len(keyStr))
-		panic(fmt.Sprintf("Invalid PWD_SECRET_KEY length: must be 32 bytes, but got %d", len(keyStr)))
+		logger.Fatal("Invalid PWD_SECRET_KEY length: must be exactly 32 bytes, but got %d bytes", fmt.Errorf("wrong key length"), len(keyStr))
 	}
 
 	encryptionKey = []byte(keyStr)
-	log.Printf("🔐 Encryption system initialized with %d-byte key", len(encryptionKey))
+	logger.Success("Encryption system initialized with %d-byte key", len(encryptionKey))
 }
 
 // deriveKey uses PBKDF2 to create a unique key for an entry from the master key and a salt.

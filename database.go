@@ -4,7 +4,8 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
+
+	"gemini_pwd/pkg/logger"
 
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
@@ -19,7 +20,7 @@ func initDB(filepath string) {
 	var err error
 	db, err = sql.Open("sqlite3", filepath+"?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=10000")
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("Failed to open database", err)
 	}
 
 	// Set connection pool settings to reduce contention
@@ -82,7 +83,7 @@ func initDB(filepath string) {
 	`
 	_, err = db.Exec(createTables)
 	if err != nil {
-		log.Fatalf("Failed to create tables: %v", err)
+		logger.Fatal("Failed to create tables", err)
 	}
 
 	// Apply database migrations
@@ -99,7 +100,7 @@ func initDB(filepath string) {
 	for _, pragma := range pragmas {
 		_, err = db.Exec(pragma)
 		if err != nil {
-			log.Printf("Warning: Failed to set pragma %s: %v", pragma, err)
+			logger.Warning("Failed to set pragma " + pragma + ": " + err.Error())
 		}
 	}
 
@@ -107,18 +108,18 @@ func initDB(filepath string) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM users WHERE username = 'super'").Scan(&count)
 	if err != nil {
-		log.Fatalf("Failed to check for super user: %v", err)
+		logger.Fatal("Failed to check for super user", err)
 	}
 
 	if count == 0 {
 		fmt.Println("Creating 'super' administrator user...")
 		hash, err := bcrypt.GenerateFromPassword([]byte("abcd1234"), bcrypt.DefaultCost)
 		if err != nil {
-			log.Fatalf("Failed to hash super user password: %v", err)
+			logger.Fatal("Failed to hash super user password", err)
 		}
 		_, err = db.Exec("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)", "super", string(hash))
 		if err != nil {
-			log.Fatalf("Failed to create super user: %v", err)
+			logger.Fatal("Failed to create super user", err)
 		}
 		fmt.Println("'super' user created with password 'abcd1234'. Please change it immediately.")
 	}
@@ -134,17 +135,17 @@ func applyMigrations() {
 	`).Scan(&columnExists)
 
 	if err != nil {
-		log.Printf("Warning: Failed to check for modified_at column: %v", err)
+		logger.Warning("Failed to check for modified_at column: " + err.Error())
 	} else if columnExists == 0 {
 		_, err = db.Exec("ALTER TABLE password_entries ADD COLUMN modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
 		if err != nil {
-			log.Printf("Warning: Failed to add modified_at column: %v", err)
+			logger.Warning("Failed to add modified_at column: " + err.Error())
 		} else {
-			log.Println("Applied migration: Added modified_at column to password_entries")
+			logger.Info("Applied migration: Added modified_at column to password_entries")
 			// Update existing entries to set modified_at = created_at
 			_, err = db.Exec("UPDATE password_entries SET modified_at = created_at WHERE modified_at IS NULL")
 			if err != nil {
-				log.Printf("Warning: Failed to update existing modified_at values: %v", err)
+				logger.Warning("Failed to update existing modified_at values: " + err.Error())
 			}
 		}
 	}

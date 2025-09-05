@@ -3,10 +3,10 @@ package main
 
 import (
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
-	"html/template"
-	"log"
+	"gemini_pwd/pkg/httputil"
+	"gemini_pwd/pkg/logger"
+	templatePkg "gemini_pwd/pkg/template"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,29 +14,20 @@ import (
 
 // parseTemplate is a helper to simplify template parsing with a base layout.
 func parseTemplate(w http.ResponseWriter, name string, data interface{}) {
-	tmpl, err := template.ParseFiles("templates/base.html", "templates/"+name)
+	err := templatePkg.RenderWithBase(w, name, data)
 	if err != nil {
-		http.Error(w, "Could not load template", http.StatusInternalServerError)
-		log.Printf("Error parsing template '%s': %v", name, err)
-		return
-	}
-
-	err = tmpl.ExecuteTemplate(w, "base.html", data)
-	if err != nil {
-		http.Error(w, "Could not render template", http.StatusInternalServerError)
-		log.Printf("Error rendering template '%s': %v", name, err)
+		httputil.InternalServerError(w, "Could not render template", err)
+		logger.Error("Failed to render template", err, "template", name)
 	}
 }
 
 // renderStandaloneTemplate is a helper for simple, non-base-templated pages.
 func renderStandaloneTemplate(w http.ResponseWriter, name string) {
-	tmpl, err := template.ParseFiles("templates/" + name)
+	err := templatePkg.RenderStandalone(w, name, nil)
 	if err != nil {
-		http.Error(w, "Could not load template", http.StatusInternalServerError)
-		log.Printf("Error parsing simple template '%s': %v", name, err)
-		return
+		httputil.InternalServerError(w, "Could not render template", err)
+		logger.Error("Failed to render standalone template", err, "template", name)
 	}
-	tmpl.Execute(w, nil)
 }
 
 // loginHandler serves the login page and handles login requests.
@@ -57,8 +48,8 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		// Check rate limiting before attempting authentication
 		isLimited, cooldownTime, err := checkRateLimit(username, clientIP)
 		if err != nil {
-			log.Printf("Error checking rate limit: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			logger.Error("Error checking rate limit", err)
+			httputil.InternalServerError(w, "", err)
 			return
 		}
 
@@ -75,8 +66,11 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 				message = fmt.Sprintf("Too many failed login attempts. Please wait %d seconds before trying again.", seconds)
 			}
 
-			http.Error(w, message, http.StatusTooManyRequests)
-			log.Printf("Rate limited login attempt for user: %s from IP: %s", username, clientIP)
+			httputil.WriteError(w, message, http.StatusTooManyRequests, nil)
+			logger.Security("Rate limited login attempt", map[string]interface{}{
+				"username": username,
+				"ip":       clientIP,
+			})
 			return
 		}
 
@@ -85,8 +79,11 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			// Record failed attempt
 			recordLoginAttempt(username, clientIP, false)
 
-			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
-			log.Printf("Failed login attempt for user: %s from IP: %s", username, clientIP)
+			httputil.Unauthorized(w, "Invalid credentials")
+			logger.Security("Failed login attempt", map[string]interface{}{
+				"username": username,
+				"ip":       clientIP,
+			})
 			return
 		}
 
@@ -96,8 +93,8 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		// Create session
 		err = createSession(w, user)
 		if err != nil {
-			log.Printf("Error creating session for user %s: %v", username, err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			logger.Error("Error creating session for user", err, username)
+			httputil.InternalServerError(w, "", err)
 			return
 		}
 
@@ -112,7 +109,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 // rateLimitCheckHandler provides an API to check rate limit status for login attempts
 func rateLimitCheckHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		httputil.MethodNotAllowed(w)
 		return
 	}
 
@@ -120,8 +117,7 @@ func rateLimitCheckHandler(w http.ResponseWriter, r *http.Request) {
 	clientIP := getClientIP(r)
 
 	if username == "" {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		httputil.WriteJSON(w, map[string]interface{}{
 			"isLimited":     false,
 			"remainingTime": 0,
 		})
@@ -130,13 +126,12 @@ func rateLimitCheckHandler(w http.ResponseWriter, r *http.Request) {
 
 	isLimited, cooldownTime, err := checkRateLimit(username, clientIP)
 	if err != nil {
-		log.Printf("Error checking rate limit for API: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		logger.Error("Error checking rate limit for API", err)
+		httputil.InternalServerError(w, "", err)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	httputil.WriteJSON(w, map[string]interface{}{
 		"isLimited":     isLimited,
 		"remainingTime": int(cooldownTime.Seconds()),
 	})
@@ -146,7 +141,7 @@ func rateLimitCheckHandler(w http.ResponseWriter, r *http.Request) {
 func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := getUserFromContext(r)
 	if !ok || user == nil {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		httputil.Unauthorized(w, "")
 		return
 	}
 
@@ -157,8 +152,10 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 func usersHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := getUserFromContext(r)
 	if !ok || user == nil || !user.IsAdmin {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		log.Printf("Access denied for non-admin user: %+v", user)
+		httputil.Forbidden(w, "")
+		logger.Security("Access denied for non-admin user", map[string]interface{}{
+			"user": fmt.Sprintf("%+v", user),
+		})
 		return
 	}
 
@@ -169,7 +166,7 @@ func usersHandler(w http.ResponseWriter, r *http.Request) {
 func tagsHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := getUserFromContext(r)
 	if !ok || user == nil {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		httputil.Unauthorized(w, "")
 		return
 	}
 
@@ -186,8 +183,11 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 func usersAPIHandler(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil || !currentUser.IsAdmin {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		log.Printf("API access denied for non-admin user: %+v", currentUser)
+		httputil.Forbidden(w, "Forbidden")
+		logger.Security("API access denied for non-admin user", map[string]interface{}{
+			"user_id":  currentUser.ID,
+			"username": currentUser.Username,
+		})
 		return
 	}
 
@@ -197,30 +197,30 @@ func usersAPIHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		users, err := getAllUsers()
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to get users: %v", err), http.StatusInternalServerError)
-			log.Printf("Error getting all users: %v", err)
+			httputil.InternalServerError(w, "Failed to get users", err)
+			logger.Error("Error getting all users", err)
 			return
 		}
-		json.NewEncoder(w).Encode(users)
+		httputil.WriteJSON(w, users)
 	case http.MethodPost:
 		var data struct {
 			Username string `json:"username"`
 			Password string `json:"password"`
 			IsAdmin  bool   `json:"isAdmin"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			log.Printf("Failed to decode JSON for user creation: %v", err)
+		if err := httputil.DecodeJSON(r, &data); err != nil {
+			httputil.BadRequest(w, "Invalid request body")
+			logger.Error("Failed to decode JSON for user creation", err)
 			return
 		}
 		if data.Username == "" || data.Password == "" {
-			http.Error(w, "Username and password are required", http.StatusBadRequest)
+			httputil.BadRequest(w, "Username and password are required")
 			return
 		}
 
 		if err := createUser(currentUser, data.Username, data.Password, data.IsAdmin, false); err != nil {
-			http.Error(w, err.Error(), http.StatusConflict)
-			log.Printf("Error creating user: %v", err)
+			httputil.InternalServerError(w, err.Error(), err)
+			logger.Error("Error creating user", err)
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
@@ -228,13 +228,13 @@ func usersAPIHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		username := r.URL.Query().Get("username")
 		if username == "" {
-			http.Error(w, "Username query parameter is required", http.StatusBadRequest)
+			httputil.BadRequest(w, "Username query parameter is required")
 			return
 		}
 
 		if err := deleteUser(currentUser, username); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			log.Printf("Error deleting user: %v", err)
+			httputil.InternalServerError(w, err.Error(), err)
+			logger.Error("Error deleting user", err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -246,65 +246,65 @@ func usersAPIHandler(w http.ResponseWriter, r *http.Request) {
 			IsAdmin     *bool  `json:"isAdmin"`
 			NewPassword string `json:"newPassword"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			log.Printf("Failed to decode JSON for user update: %v", err)
+		if err := httputil.DecodeJSON(r, &data); err != nil {
+			httputil.BadRequest(w, "Invalid request body")
+			logger.Error("Failed to decode JSON for user update", err)
 			return
 		}
 
 		var targetUserID int
 		err := db.QueryRow("SELECT id FROM users WHERE username = ? COLLATE NOCASE", data.Username).Scan(&targetUserID)
 		if err != nil {
-			http.Error(w, "User not found", http.StatusNotFound)
+			httputil.BadRequest(w, "User not found")
 			return
 		}
 
 		if data.NewUsername != "" {
 			if err := renameUser(currentUser, targetUserID, data.Username, data.NewUsername); err != nil {
-				http.Error(w, err.Error(), http.StatusConflict)
-				log.Printf("Error renaming user: %v", err)
+				httputil.InternalServerError(w, err.Error(), err)
+				logger.Error("Error renaming user", err)
 				return
 			}
 		}
 
 		if data.IsAdmin != nil {
 			if err := changeAdminStatus(currentUser, data.Username, *data.IsAdmin); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				log.Printf("Error changing admin status: %v", err)
+				httputil.InternalServerError(w, err.Error(), err)
+				logger.Error("Error changing admin status", err)
 				return
 			}
 		}
 
 		if data.NewPassword != "" {
 			if err := changePassword(currentUser, data.Username, "", data.NewPassword); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				log.Printf("Error changing password: %v", err)
+				httputil.InternalServerError(w, err.Error(), err)
+				logger.Error("Error changing password", err)
 				return
 			}
 
 			// Invalidate all sessions for the target user after admin password change
 			if err := clearAllUserSessions(targetUserID); err != nil {
-				log.Printf("Error clearing sessions after admin password change for user '%s': %v", data.Username, err)
+				logger.Error("Error clearing sessions after admin password change for user '"+data.Username+"'", err)
 			}
 		}
 
 		w.WriteHeader(http.StatusOK)
 
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		httputil.MethodNotAllowed(w)
 	}
 }
 
 // changeMyPasswordHandler provides an endpoint for a user to update their own password.
 func changeMyPasswordHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		httputil.MethodNotAllowed(w)
 		return
 	}
 
 	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
-		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		httputil.Unauthorized(w, "User not authenticated")
 		return
 	}
 
@@ -312,25 +312,25 @@ func changeMyPasswordHandler(w http.ResponseWriter, r *http.Request) {
 		CurrentPassword string `json:"currentPassword"`
 		NewPassword     string `json:"newPassword"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		log.Printf("Failed to decode JSON for password change: %v", err)
+	if err := httputil.DecodeJSON(r, &data); err != nil {
+		httputil.BadRequest(w, "Invalid request body")
+		logger.Error("Failed to decode JSON for password change", err)
 		return
 	}
 	if data.CurrentPassword == "" || data.NewPassword == "" {
-		http.Error(w, "Current and new passwords are required", http.StatusBadRequest)
+		httputil.BadRequest(w, "Current and new passwords are required")
 		return
 	}
 
 	if err := changePassword(currentUser, currentUser.Username, data.CurrentPassword, data.NewPassword); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Printf("Error changing password for user '%s': %v", currentUser.Username, err)
+		httputil.InternalServerError(w, err.Error(), err)
+		logger.Error("Error changing password for user '"+currentUser.Username+"'", err)
 		return
 	}
 
 	// Invalidate all sessions for this user after password change
 	if err := clearAllUserSessions(currentUser.ID); err != nil {
-		log.Printf("Error clearing sessions after password change for user '%s': %v", currentUser.Username, err)
+		logger.Error("Error clearing sessions after password change for user '"+currentUser.Username+"'", err)
 	}
 
 	// Clear current session cookie
@@ -348,7 +348,7 @@ func testHandler(w http.ResponseWriter, r *http.Request) {
 func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		httputil.Forbidden(w, "Forbidden")
 		return
 	}
 
@@ -364,15 +364,15 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			// Fetch individual password for editing or copying
 			id, err := strconv.Atoi(passwordID)
 			if err != nil {
-				http.Error(w, "Invalid password ID", http.StatusBadRequest)
+				httputil.BadRequest(w, "Invalid password ID")
 				return
 			}
 
 			// Get the password entry with user verification
 			password, err := getPasswordByID(currentUser.ID, id)
 			if err != nil {
-				log.Printf("Error retrieving password for user %d, ID %d: %v", currentUser.ID, id, err)
-				http.Error(w, "Password not found", http.StatusNotFound)
+				logger.Error("Error retrieving password for user", err, "user_id", currentUser.ID, "password_id", id)
+				httputil.BadRequest(w, "Password not found")
 				return
 			}
 
@@ -380,8 +380,8 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 				// For copy action, decrypt and return only the password value
 				decryptedPassword, err := getDecryptedPassword(currentUser.ID, id)
 				if err != nil {
-					log.Printf("Error decrypting password for copy: %v", err)
-					http.Error(w, "Failed to decrypt password", http.StatusInternalServerError)
+					logger.Error("Error decrypting password for copy", err)
+					httputil.InternalServerError(w, "Failed to decrypt password", err)
 					return
 				}
 
@@ -393,15 +393,15 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 				// For edit action, decrypt password and notes fields
 				decryptedPassword, err := getDecryptedPassword(currentUser.ID, id)
 				if err != nil {
-					log.Printf("Error decrypting password for edit: %v", err)
-					http.Error(w, "Failed to decrypt password", http.StatusInternalServerError)
+					logger.Error("Error decrypting password for edit", err)
+					httputil.InternalServerError(w, "Failed to decrypt password", err)
 					return
 				}
 
 				decryptedNotes, err := getDecryptedNotes(currentUser.ID, id)
 				if err != nil {
-					log.Printf("Error decrypting notes for edit: %v", err)
-					http.Error(w, "Failed to decrypt notes", http.StatusInternalServerError)
+					logger.Error("Error decrypting notes for edit", err)
+					httputil.InternalServerError(w, "Failed to decrypt notes", err)
 					return
 				}
 
@@ -410,7 +410,7 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 				password.Notes = decryptedNotes
 
 				// Return the full password entry with decrypted password and notes
-				json.NewEncoder(w).Encode(password)
+				httputil.WriteJSON(w, password)
 				return
 			}
 		}
@@ -419,11 +419,11 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query().Get("q")
 		passwords, err := getPasswords(currentUser.ID, query)
 		if err != nil {
-			log.Printf("Error retrieving passwords for user %d: %v", currentUser.ID, err)
-			http.Error(w, "Failed to retrieve passwords", http.StatusInternalServerError)
+			logger.Error("Error retrieving passwords for user", err, "user_id", currentUser.ID)
+			httputil.InternalServerError(w, "Failed to retrieve passwords", err)
 			return
 		}
-		json.NewEncoder(w).Encode(passwords)
+		httputil.WriteJSON(w, passwords)
 	case http.MethodPost:
 		var data struct {
 			Site     string   `json:"site"`
@@ -432,25 +432,25 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			Notes    string   `json:"notes"`
 			Tags     []string `json:"tags"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+		if err := httputil.DecodeJSON(r, &data); err != nil {
+			httputil.BadRequest(w, "Invalid request body")
 			return
 		}
 		if data.Site == "" || data.Username == "" {
-			http.Error(w, "Site and username are required", http.StatusBadRequest)
+			httputil.BadRequest(w, "Site and username are required")
 			return
 		}
 
 		if err := createPasswordEntry(currentUser.ID, data.Site, data.Username, data.Password, data.Notes, data.Tags); err != nil {
-			http.Error(w, fmt.Sprintf("Failed to create password: %v", err), http.StatusInternalServerError)
+			httputil.InternalServerError(w, "Failed to create password", err)
 			return
 		}
 
 		// Fetch the created password entry to return it (without sensitive data)
 		passwords, err := getPasswords(currentUser.ID, "")
 		if err != nil {
-			log.Printf("Error retrieving passwords after creation: %v", err)
-			http.Error(w, "Password created but failed to retrieve", http.StatusInternalServerError)
+			logger.Error("Error retrieving passwords after creation", err)
+			httputil.InternalServerError(w, "Password created but failed to retrieve", err)
 			return
 		}
 
@@ -464,27 +464,27 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if createdPassword == nil {
-			http.Error(w, "Password created but not found", http.StatusInternalServerError)
+			httputil.InternalServerError(w, "Password created but not found", nil)
 			return
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(createdPassword)
+		httputil.WriteJSON(w, createdPassword)
 	case http.MethodDelete:
 		passwordID := r.URL.Query().Get("id")
 		if passwordID == "" {
-			http.Error(w, "Password ID is required", http.StatusBadRequest)
+			httputil.BadRequest(w, "Password ID is required")
 			return
 		}
 
 		id, err := strconv.Atoi(passwordID)
 		if err != nil {
-			http.Error(w, "Invalid password ID", http.StatusBadRequest)
+			httputil.BadRequest(w, "Invalid password ID")
 			return
 		}
 
 		if err := deletePasswordEntry(currentUser.ID, id); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httputil.InternalServerError(w, err.Error(), err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -497,24 +497,24 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			Notes    string   `json:"notes"`
 			Tags     []string `json:"tags"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+		if err := httputil.DecodeJSON(r, &data); err != nil {
+			httputil.BadRequest(w, "Invalid request body")
 			return
 		}
 		if data.Site == "" || data.Username == "" {
-			http.Error(w, "Site and username are required", http.StatusBadRequest)
+			httputil.BadRequest(w, "Site and username are required")
 			return
 		}
 
-		log.Printf("Updating password entry: userID=%d, entryID=%d, site=%s, username=%s, tags=%v", currentUser.ID, data.ID, data.Site, data.Username, data.Tags)
+		logger.Info("Updating password entry", "user_id", currentUser.ID, "entry_id", data.ID, "site", data.Site, "username", data.Username, "tags", data.Tags)
 		if err := updatePasswordEntry(currentUser.ID, data.ID, data.Site, data.Username, data.Password, data.Notes, data.Tags); err != nil {
-			log.Printf("Error updating password entry: %v", err)
-			http.Error(w, fmt.Sprintf("Failed to update password: %v", err), http.StatusInternalServerError)
+			logger.Error("Error updating password entry", err)
+			httputil.InternalServerError(w, "Failed to update password", err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		httputil.MethodNotAllowed(w)
 	}
 }
 
@@ -522,7 +522,7 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		httputil.Forbidden(w, "Forbidden")
 		return
 	}
 
@@ -534,22 +534,22 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 		if tagIDStr != "" {
 			tagID, err := strconv.Atoi(tagIDStr)
 			if err != nil {
-				http.Error(w, "Invalid tag ID", http.StatusBadRequest)
+				httputil.BadRequest(w, "Invalid tag ID")
 				return
 			}
 			tag, err := getTagByID(currentUser.ID, tagID)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusNotFound)
+				httputil.BadRequest(w, err.Error())
 				return
 			}
-			json.NewEncoder(w).Encode(tag)
+			httputil.WriteJSON(w, tag)
 		} else {
 			tags, err := getTags(currentUser.ID)
 			if err != nil {
-				http.Error(w, "Failed to retrieve tags", http.StatusInternalServerError)
+				httputil.InternalServerError(w, "Failed to retrieve tags", err)
 				return
 			}
-			json.NewEncoder(w).Encode(tags)
+			httputil.WriteJSON(w, tags)
 		}
 	case http.MethodPost:
 		var data struct {
@@ -557,28 +557,28 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			Description string `json:"description"`
 			Color       string `json:"color"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+		if err := httputil.DecodeJSON(r, &data); err != nil {
+			httputil.BadRequest(w, "Invalid request body")
 			return
 		}
 		if data.Name == "" {
-			http.Error(w, "Tag name is required", http.StatusBadRequest)
+			httputil.BadRequest(w, "Tag name is required")
 			return
 		}
 		if err := createTag(currentUser.ID, data.Name, data.Description, data.Color); err != nil {
-			http.Error(w, fmt.Sprintf("Failed to create tag: %v", err), http.StatusInternalServerError)
+			httputil.InternalServerError(w, "Failed to create tag", err)
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
 	case http.MethodPut:
 		tagIDStr := r.URL.Query().Get("id")
 		if tagIDStr == "" {
-			http.Error(w, "Tag ID is required for update", http.StatusBadRequest)
+			httputil.BadRequest(w, "Tag ID is required for update")
 			return
 		}
 		tagID, err := strconv.Atoi(tagIDStr)
 		if err != nil {
-			http.Error(w, "Invalid tag ID", http.StatusBadRequest)
+			httputil.BadRequest(w, "Invalid tag ID")
 			return
 		}
 
@@ -587,46 +587,46 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			Description string `json:"description"`
 			Color       string `json:"color"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+		if err := httputil.DecodeJSON(r, &data); err != nil {
+			httputil.BadRequest(w, "Invalid request body")
 			return
 		}
 		if data.Name == "" {
-			http.Error(w, "Tag name is required", http.StatusBadRequest)
+			httputil.BadRequest(w, "Tag name is required")
 			return
 		}
 		if err := updateTag(currentUser.ID, tagID, data.Name, data.Description, data.Color); err != nil {
-			http.Error(w, fmt.Sprintf("Failed to update tag: %v", err), http.StatusInternalServerError)
+			httputil.InternalServerError(w, "Failed to update tag", err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 	case http.MethodDelete:
 		tagID := r.URL.Query().Get("id")
 		if tagID == "" {
-			http.Error(w, "Tag ID is required", http.StatusBadRequest)
+			httputil.BadRequest(w, "Tag ID is required")
 			return
 		}
 
 		id, err := strconv.Atoi(tagID)
 		if err != nil {
-			http.Error(w, "Invalid tag ID", http.StatusBadRequest)
+			httputil.BadRequest(w, "Invalid tag ID")
 			return
 		}
 
 		if err := deleteTag(currentUser.ID, id); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httputil.InternalServerError(w, err.Error(), err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		httputil.MethodNotAllowed(w)
 	}
 }
 
 func exportTagsHandler(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		httputil.Forbidden(w, "Forbidden")
 		return
 	}
 
@@ -642,8 +642,8 @@ func exportTagsHandler(w http.ResponseWriter, r *http.Request) {
 
 	tags, err := getTags(currentUser.ID)
 	if err != nil {
-		http.Error(w, "Failed to retrieve tags for export", http.StatusInternalServerError)
-		log.Printf("Error getting tags for user %d for export: %v", currentUser.ID, err)
+		httputil.InternalServerError(w, "Failed to retrieve tags for export", err)
+		logger.Error("Error getting tags for user for export", err, "user_id", currentUser.ID)
 		return
 	}
 
@@ -664,20 +664,20 @@ func exportTagsHandler(w http.ResponseWriter, r *http.Request) {
 
 func importTagsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		httputil.MethodNotAllowed(w)
 		return
 	}
 
 	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		httputil.Forbidden(w, "Forbidden")
 		return
 	}
 
 	file, _, err := r.FormFile("importFile")
 	if err != nil {
-		http.Error(w, "Failed to read uploaded file", http.StatusBadRequest)
-		log.Printf("Error reading form file: %v", err)
+		httputil.BadRequest(w, "Failed to read uploaded file")
+		logger.Error("Error reading form file", err)
 		return
 	}
 	defer file.Close()
@@ -685,8 +685,8 @@ func importTagsHandler(w http.ResponseWriter, r *http.Request) {
 	reader := csv.NewReader(file)
 	records, err := reader.ReadAll()
 	if err != nil {
-		http.Error(w, "Failed to parse CSV file", http.StatusBadRequest)
-		log.Printf("Error parsing CSV: %v", err)
+		httputil.BadRequest(w, "Failed to parse CSV file")
+		logger.Error("Error parsing CSV", err)
 		return
 	}
 
@@ -696,14 +696,14 @@ func importTagsHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if len(record) < 3 {
-			log.Printf("Skipping malformed record on line %d", i+1)
+			logger.Warning("Skipping malformed record on line " + fmt.Sprintf("%d", i+1))
 			continue
 		}
 		// record[0] = Name, record[1] = Description, record[2] = Color
 		err := createOrUpdateTag(currentUser.ID, record[0], record[1], record[2])
 		if err != nil {
 			// Log error but continue processing other tags
-			log.Printf("Failed to import tag '%s' on line %d: %v", record[0], i+1, err)
+			logger.Error("Failed to import tag '"+record[0]+"' on line "+fmt.Sprintf("%d", i+1), err)
 		}
 	}
 
@@ -713,7 +713,7 @@ func importTagsHandler(w http.ResponseWriter, r *http.Request) {
 func exportPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		httputil.Forbidden(w, "Forbidden")
 		return
 	}
 
@@ -729,8 +729,8 @@ func exportPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 
 	passwords, err := getAllDecryptedPasswords(currentUser.ID)
 	if err != nil {
-		http.Error(w, "Failed to retrieve passwords for export", http.StatusInternalServerError)
-		log.Printf("Error getting passwords for user %d for export: %v", currentUser.ID, err)
+		httputil.InternalServerError(w, "Failed to retrieve passwords for export", err)
+		logger.Error("Error getting passwords for user for export", err, "user_id", currentUser.ID)
 		return
 	}
 
@@ -755,19 +755,19 @@ func exportPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 
 func importPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		httputil.MethodNotAllowed(w)
 		return
 	}
 
 	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		httputil.Forbidden(w, "Forbidden")
 		return
 	}
 
 	file, _, err := r.FormFile("importFile")
 	if err != nil {
-		http.Error(w, "Failed to read uploaded file", http.StatusBadRequest)
+		httputil.BadRequest(w, "Failed to read uploaded file")
 		return
 	}
 	defer file.Close()
@@ -775,7 +775,7 @@ func importPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 	reader := csv.NewReader(file)
 	records, err := reader.ReadAll()
 	if err != nil {
-		http.Error(w, "Failed to parse CSV file", http.StatusBadRequest)
+		httputil.BadRequest(w, "Failed to parse CSV file")
 		return
 	}
 
@@ -784,18 +784,18 @@ func importPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if len(record) < 5 {
-			log.Printf("Skipping malformed password record on line %d: expected 5 columns (site, username, password, notes, tags), got %d columns: %v", i+1, len(record), record)
+			logger.Warning("Skipping malformed password record on line " + fmt.Sprintf("%d", i+1) + ": expected 5 columns (site, username, password, notes, tags), got " + fmt.Sprintf("%d", len(record)) + " columns")
 			continue
 		}
 		site, username, password, notes, tagsStr := record[0], record[1], record[2], record[3], record[4]
 
 		// Validate required fields
 		if strings.TrimSpace(site) == "" {
-			log.Printf("Skipping password record on line %d: site field is empty", i+1)
+			logger.Warning("Skipping password record on line " + fmt.Sprintf("%d", i+1) + ": site field is empty")
 			continue
 		}
 		if strings.TrimSpace(username) == "" {
-			log.Printf("Skipping password record on line %d: username field is empty", i+1)
+			logger.Warning("Skipping password record on line " + fmt.Sprintf("%d", i+1) + ": username field is empty")
 			continue
 		}
 
@@ -808,7 +808,7 @@ func importPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 
 		err := createOrUpdatePasswordEntry(currentUser.ID, site, username, password, notes, tags)
 		if err != nil {
-			log.Printf("Failed to import password for site '%s' on line %d: %v", site, i+1, err)
+			logger.Error("Failed to import password for site '"+site+"' on line "+fmt.Sprintf("%d", i+1), err)
 		}
 	}
 
@@ -819,12 +819,12 @@ func importPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 func checkPasswordDuplicateHandler(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := getUserFromContext(r)
 	if !ok || currentUser == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		httputil.Unauthorized(w, "Unauthorized")
 		return
 	}
 
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		httputil.MethodNotAllowed(w)
 		return
 	}
 
@@ -834,8 +834,8 @@ func checkPasswordDuplicateHandler(w http.ResponseWriter, r *http.Request) {
 		ID       int    `json:"id,omitempty"` // For edit mode, exclude this entry from duplicate check
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if err := httputil.DecodeJSON(r, &request); err != nil {
+		httputil.BadRequest(w, "Invalid JSON")
 		return
 	}
 
@@ -854,7 +854,7 @@ func checkPasswordDuplicateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		httputil.InternalServerError(w, "Database error", err)
 		return
 	}
 
@@ -864,6 +864,5 @@ func checkPasswordDuplicateHandler(w http.ResponseWriter, r *http.Request) {
 		IsDuplicate: count > 0,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	httputil.WriteJSON(w, response)
 }

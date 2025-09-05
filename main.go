@@ -2,7 +2,8 @@
 package main
 
 import (
-	"log"
+	"gemini_pwd/pkg/logger"
+	"gemini_pwd/pkg/template"
 	"net/http"
 	"os"
 	"time"
@@ -43,8 +44,11 @@ func main() {
 
 	// Update any existing tags with empty colors to use the default color
 	if err := updateEmptyTagColors(); err != nil {
-		log.Printf("Warning: Failed to update empty tag colors: %v", err)
+		logger.Warning("Failed to update empty tag colors: %v", err)
 	}
+
+	// Initialize template renderer
+	template.InitRenderer("templates", "base.html")
 
 	// Start cleanup routines
 	startCleanupRoutines()
@@ -82,13 +86,13 @@ func main() {
 	if port == "" {
 		port = "7000"
 	}
-	log.Printf("Starting server on :%s", port)
-	log.Println("Security features enabled:")
-	log.Println("- Database-backed sessions")
-	log.Println("- Rate limiting on login attempts")
-	log.Println("- Security headers")
-	log.Println("- Session invalidation on password change")
+	logger.Info("Starting server on :%s", port)
+	logger.Info("Security features enabled:")
+	logger.Info("- Database-backed sessions")
+	logger.Info("- Rate limiting on login attempts")
+	logger.Info("- Security headers")
+	logger.Info("- Session invalidation on password change")
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+		logger.Fatal("Server failed to start: %v", err, nil)
 	}
 }

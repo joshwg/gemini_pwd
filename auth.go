@@ -5,11 +5,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	"gemini_pwd/pkg/logger"
 
 	"github.com/google/uuid"
 )
@@ -179,7 +180,7 @@ func clearSession(w http.ResponseWriter, r *http.Request) {
 	// Delete from database
 	_, err = db.Exec("DELETE FROM sessions WHERE id = ?", c.Value)
 	if err != nil {
-		log.Printf("Error deleting session from database: %v", err)
+		logger.Error("Error deleting session from database", err)
 	}
 
 	// Clear cookie
@@ -243,9 +244,9 @@ func validateSession(sessionToken string) (*User, error) {
 			}
 
 			// For other errors or final retry, log the error
-			log.Printf("Error updating session expiration (attempt %d/%d): %v", i+1, maxRetries, err)
+			logger.Error("Error updating session expiration", err, "attempt", fmt.Sprintf("%d/%d", i+1, maxRetries))
 			if i == maxRetries-1 {
-				log.Printf("Failed to update session expiration after %d attempts", maxRetries)
+				logger.Error("Failed to update session expiration after max attempts", nil, "attempts", maxRetries)
 			}
 		}
 	}()
@@ -263,7 +264,7 @@ func validateSession(sessionToken string) (*User, error) {
 func cleanupExpiredSessions() {
 	_, err := db.Exec("DELETE FROM sessions WHERE expires_at <= ?", time.Now())
 	if err != nil {
-		log.Printf("Error cleaning up expired sessions: %v", err)
+		logger.Error("Error cleaning up expired sessions", err)
 	}
 }
 
@@ -272,7 +273,7 @@ func cleanupOldLoginAttempts() {
 	cutoff := time.Now().Add(-24 * time.Hour)
 	_, err := db.Exec("DELETE FROM login_attempts WHERE attempted_at <= ?", cutoff)
 	if err != nil {
-		log.Printf("Error cleaning up old login attempts: %v", err)
+		logger.Error("Error cleaning up old login attempts", err)
 	}
 }
 
