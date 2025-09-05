@@ -904,10 +904,13 @@
                 
                 // Password display area with show/hide and copy functionality
                 const passwordHTML = 
-                    '<div class="flex items-center gap-2">' +
+                    '<div class="flex items-center gap-2 relative">' +
                         '<input type="password" id="password-' + p.id + '" class="password-display flex-1 py-1 px-2 text-sm border rounded bg-gray-50" placeholder="••••••••" readonly>' +
                         '<button class="show-password-btn p-1 transform hover:text-blue-500 hover:scale-110" data-id="' + p.id + '" title="Show/Hide password"><i class="fas fa-eye"></i></button>' +
                         '<button class="copy-password-btn p-1 transform hover:text-green-500 hover:scale-110" data-id="' + p.id + '" title="Copy password to clipboard"><i class="fas fa-copy"></i></button>' +
+                        '<div id="copy-message-' + p.id + '" class="absolute right-0 top-full mt-1 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg hidden z-10">' +
+                            '<i class="fas fa-check mr-1"></i>Copied!' +
+                        '</div>' +
                     '</div>';
                 
                 // Card HTML structure
@@ -1006,22 +1009,47 @@
         }
         
         async function copyPassword(id) {
-            // Need a new API endpoint to get password data and decrypt it
             try {
                 const response = await fetch(API_ORIGIN + '/api/passwords?id=' + id + '&action=copy');
                 if (!response.ok) throw new Error('Failed to fetch password for copying.');
                 const password = await response.text();
-                // Copy to clipboard
-                const tempInput = document.createElement('input');
-                tempInput.value = password;
-                document.body.appendChild(tempInput);
-                tempInput.select();
-                document.execCommand('copy');
-                document.body.removeChild(tempInput);
-                alert('Password copied to clipboard!');
+                
+                // Copy to clipboard using modern API with fallback
+                try {
+                    if (navigator.clipboard && window.isSecureContext) {
+                        await navigator.clipboard.writeText(password);
+                    } else {
+                        // Fallback for older browsers or non-HTTPS
+                        const tempInput = document.createElement('input');
+                        tempInput.value = password;
+                        document.body.appendChild(tempInput);
+                        tempInput.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(tempInput);
+                    }
+                } catch (clipboardError) {
+                    // Fallback if clipboard API fails
+                    const tempInput = document.createElement('input');
+                    tempInput.value = password;
+                    document.body.appendChild(tempInput);
+                    tempInput.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tempInput);
+                }
+                
+                // Show inline success message
+                const messageElement = document.getElementById('copy-message-' + id);
+                if (messageElement) {
+                    messageElement.classList.remove('hidden');
+                    // Auto-hide after 2 seconds
+                    setTimeout(() => {
+                        messageElement.classList.add('hidden');
+                    }, 2000);
+                }
             } catch (e) {
                 console.error(e);
-                alert(e.message);
+                // For errors, still use alert as it's important feedback
+                alert('Failed to copy password: ' + e.message);
             }
         }
 
