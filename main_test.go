@@ -3,6 +3,7 @@ package main
 
 import (
 	"database/sql"
+	templatePkg "gemini_pwd/pkg/template"
 	"log"
 	"os"
 	"testing"
@@ -25,6 +26,9 @@ func TestMain(m *testing.M) {
 	if err := createSchema(); err != nil {
 		log.Fatalf("Failed to create database schema: %v", err)
 	}
+
+	// Initialize template renderer for tests
+	templatePkg.InitRenderer("templates", "base.html")
 
 	// Run the tests
 	exitCode := m.Run()

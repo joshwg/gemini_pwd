@@ -4,6 +4,7 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
+	"gemini_pwd/pkg/api"
 	"gemini_pwd/pkg/httputil"
 	"gemini_pwd/pkg/logger"
 	templatePkg "gemini_pwd/pkg/template"
@@ -117,10 +118,7 @@ func rateLimitCheckHandler(w http.ResponseWriter, r *http.Request) {
 	clientIP := getClientIP(r)
 
 	if username == "" {
-		httputil.WriteJSON(w, map[string]interface{}{
-			"isLimited":     false,
-			"remainingTime": 0,
-		})
+		api.WriteRateLimitResponse(w, false, 0)
 		return
 	}
 
@@ -131,10 +129,7 @@ func rateLimitCheckHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httputil.WriteJSON(w, map[string]interface{}{
-		"isLimited":     isLimited,
-		"remainingTime": int(cooldownTime.Seconds()),
-	})
+	api.WriteRateLimitResponse(w, isLimited, int(cooldownTime.Seconds()))
 }
 
 // dashboardHandler serves the main user dashboard.
@@ -203,14 +198,8 @@ func usersAPIHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		httputil.WriteJSON(w, users)
 	case http.MethodPost:
-		var data struct {
-			Username string `json:"username"`
-			Password string `json:"password"`
-			IsAdmin  bool   `json:"isAdmin"`
-		}
-		if err := httputil.DecodeJSON(r, &data); err != nil {
-			httputil.BadRequest(w, "Invalid request body")
-			logger.Error("Failed to decode JSON for user creation", err)
+		var data api.CreateUserRequest
+		if !api.DecodeRequest(w, r, &data, "user creation") {
 			return
 		}
 		if data.Username == "" || data.Password == "" {
@@ -219,7 +208,11 @@ func usersAPIHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := createUser(currentUser, data.Username, data.Password, data.IsAdmin, false); err != nil {
-			httputil.InternalServerError(w, err.Error(), err)
+			if strings.Contains(err.Error(), "username already exists") {
+				httputil.WriteError(w, err.Error(), http.StatusConflict, err)
+			} else {
+				httputil.InternalServerError(w, err.Error(), err)
+			}
 			logger.Error("Error creating user", err)
 			return
 		}
@@ -240,15 +233,8 @@ func usersAPIHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 
 	case http.MethodPut:
-		var data struct {
-			Username    string `json:"username"`
-			NewUsername string `json:"newUsername"`
-			IsAdmin     *bool  `json:"isAdmin"`
-			NewPassword string `json:"newPassword"`
-		}
-		if err := httputil.DecodeJSON(r, &data); err != nil {
-			httputil.BadRequest(w, "Invalid request body")
-			logger.Error("Failed to decode JSON for user update", err)
+		var data api.UpdateUserRequest
+		if !api.DecodeRequest(w, r, &data, "user update") {
 			return
 		}
 
@@ -308,13 +294,8 @@ func changeMyPasswordHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var data struct {
-		CurrentPassword string `json:"currentPassword"`
-		NewPassword     string `json:"newPassword"`
-	}
-	if err := httputil.DecodeJSON(r, &data); err != nil {
-		httputil.BadRequest(w, "Invalid request body")
-		logger.Error("Failed to decode JSON for password change", err)
+	var data api.ChangePasswordRequest
+	if !api.DecodeRequest(w, r, &data, "password change") {
 		return
 	}
 	if data.CurrentPassword == "" || data.NewPassword == "" {
@@ -372,7 +353,7 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			password, err := getPasswordByID(currentUser.ID, id)
 			if err != nil {
 				logger.Error("Error retrieving password for user", err, "user_id", currentUser.ID, "password_id", id)
-				httputil.BadRequest(w, "Password not found")
+				httputil.WriteError(w, "Password not found", http.StatusNotFound, err)
 				return
 			}
 
@@ -425,15 +406,8 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		httputil.WriteJSON(w, passwords)
 	case http.MethodPost:
-		var data struct {
-			Site     string   `json:"site"`
-			Username string   `json:"username"`
-			Password string   `json:"password"`
-			Notes    string   `json:"notes"`
-			Tags     []string `json:"tags"`
-		}
-		if err := httputil.DecodeJSON(r, &data); err != nil {
-			httputil.BadRequest(w, "Invalid request body")
+		var data api.CreatePasswordRequest
+		if !api.DecodeRequest(w, r, &data, "password creation") {
 			return
 		}
 		if data.Site == "" || data.Username == "" {
@@ -489,16 +463,8 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 	case http.MethodPut:
-		var data struct {
-			ID       int      `json:"id"`
-			Site     string   `json:"site"`
-			Username string   `json:"username"`
-			Password string   `json:"password"`
-			Notes    string   `json:"notes"`
-			Tags     []string `json:"tags"`
-		}
-		if err := httputil.DecodeJSON(r, &data); err != nil {
-			httputil.BadRequest(w, "Invalid request body")
+		var data api.UpdatePasswordRequest
+		if !api.DecodeRequest(w, r, &data, "password update") {
 			return
 		}
 		if data.Site == "" || data.Username == "" {
@@ -539,7 +505,7 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			tag, err := getTagByID(currentUser.ID, tagID)
 			if err != nil {
-				httputil.BadRequest(w, err.Error())
+				httputil.WriteError(w, err.Error(), http.StatusNotFound, err)
 				return
 			}
 			httputil.WriteJSON(w, tag)
@@ -552,13 +518,8 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteJSON(w, tags)
 		}
 	case http.MethodPost:
-		var data struct {
-			Name        string `json:"name"`
-			Description string `json:"description"`
-			Color       string `json:"color"`
-		}
-		if err := httputil.DecodeJSON(r, &data); err != nil {
-			httputil.BadRequest(w, "Invalid request body")
+		var data api.CreateTagRequest
+		if !api.DecodeRequest(w, r, &data, "tag creation") {
 			return
 		}
 		if data.Name == "" {
@@ -582,13 +543,8 @@ func tagsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var data struct {
-			Name        string `json:"name"`
-			Description string `json:"description"`
-			Color       string `json:"color"`
-		}
-		if err := httputil.DecodeJSON(r, &data); err != nil {
-			httputil.BadRequest(w, "Invalid request body")
+		var data api.UpdateTagRequest
+		if !api.DecodeRequest(w, r, &data, "tag update") {
 			return
 		}
 		if data.Name == "" {
@@ -828,14 +784,8 @@ func checkPasswordDuplicateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var request struct {
-		Site     string `json:"site"`
-		Username string `json:"username"`
-		ID       int    `json:"id,omitempty"` // For edit mode, exclude this entry from duplicate check
-	}
-
-	if err := httputil.DecodeJSON(r, &request); err != nil {
-		httputil.BadRequest(w, "Invalid JSON")
+	var request api.CheckDuplicateRequest
+	if !api.DecodeRequest(w, r, &request, "duplicate check") {
 		return
 	}
 
@@ -858,11 +808,5 @@ func checkPasswordDuplicateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := struct {
-		IsDuplicate bool `json:"isDuplicate"`
-	}{
-		IsDuplicate: count > 0,
-	}
-
-	httputil.WriteJSON(w, response)
+	api.WriteDuplicateCheckResponse(w, count > 0)
 }
