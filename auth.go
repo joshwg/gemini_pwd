@@ -295,7 +295,7 @@ func securityHeaders(next http.HandlerFunc) http.HandlerFunc {
 			"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.tailwindcss.com; " +
 			"font-src 'self' https://cdnjs.cloudflare.com; " +
 			"img-src 'self' data:; " +
-			"connect-src 'self'; " +
+			"connect-src 'self' https://cdn.jsdelivr.net; " +
 			"object-src 'none'; " +
 			"base-uri 'self'"
 		w.Header().Set("Content-Security-Policy", csp)

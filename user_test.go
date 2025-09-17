@@ -7,8 +7,8 @@ import (
 
 // TestCreateUser tests the createUser function.
 func TestCreateUser(t *testing.T) {
-	// Setup: Ensure the database is clean before the test
-	db.Exec("DELETE FROM users")
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
 
 	// Create a dummy admin user for context
 	admin := &User{ID: 1, Username: "admin", IsAdmin: true}
@@ -45,9 +45,10 @@ func TestCreateUser(t *testing.T) {
 
 // TestCreateTag tests the createTag function.
 func TestCreateTag(t *testing.T) {
-	// Setup: Ensure the database is clean and we have a user
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
 	db.Exec("DELETE FROM tags")
-	db.Exec("DELETE FROM users")
+
 	// We need a user to associate the tag with
 	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'testuser', 'hash', 0)")
 
@@ -76,11 +77,11 @@ func TestCreateTag(t *testing.T) {
 
 // TestCreatePasswordEntry tests the createPasswordEntry function.
 func TestCreatePasswordEntry(t *testing.T) {
-	// Setup: Ensure the database is clean and we have a user
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
 	db.Exec("DELETE FROM password_entries")
 	db.Exec("DELETE FROM entry_tags")
 	db.Exec("DELETE FROM tags")
-	db.Exec("DELETE FROM users")
 	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'testuser', 'hash', 0)")
 
 	// Test case 1: Successful password entry creation with a new tag

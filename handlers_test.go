@@ -62,8 +62,10 @@ func TestDashboardHandler(t *testing.T) {
 
 // TestUsersAPIHandler_Admin tests comprehensive CRUD operations for users by admin.
 func TestUsersAPIHandler_Admin(t *testing.T) {
-	// Setup: Clean database and create admin user
-	db.Exec("DELETE FROM users")
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
+
+	// Setup: Create admin user
 	admin := &User{ID: 1, Username: "admin", IsAdmin: true}
 	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'admin', 'hash', 1)")
 
@@ -194,8 +196,8 @@ func TestUsersAPIHandler_Admin(t *testing.T) {
 
 // TestUsersAPIHandler_NonAdmin tests that a non-admin is forbidden.
 func TestUsersAPIHandler_NonAdmin(t *testing.T) {
-	// Setup
-	db.Exec("DELETE FROM users")
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
 	nonAdmin := &User{ID: 2, Username: "nonadmin", IsAdmin: false}
 	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (2, 'nonadmin', 'hash', 0)")
 
@@ -210,9 +212,8 @@ func TestUsersAPIHandler_NonAdmin(t *testing.T) {
 
 // TestPasswordsAPIHandler tests the passwords API.
 func TestPasswordsAPIHandler(t *testing.T) {
-	// Setup
-	db.Exec("DELETE FROM password_entries")
-	db.Exec("DELETE FROM users")
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
 	user := &User{ID: 1, Username: "testuser", IsAdmin: false}
 	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'testuser', 'hash', 0)")
 
@@ -388,9 +389,10 @@ func TestPasswordsAPIHandler(t *testing.T) {
 
 // TestTagsAPIHandler tests comprehensive CRUD operations for tags.
 func TestTagsAPIHandler(t *testing.T) {
-	// Setup: Clean database and create test user
-	db.Exec("DELETE FROM tags")
-	db.Exec("DELETE FROM users")
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
+
+	// Setup: Create test user
 	user := &User{ID: 1, Username: "testuser", IsAdmin: false}
 	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'testuser', 'hash', 0)")
 
@@ -655,9 +657,8 @@ func TestTagsAPIHandler(t *testing.T) {
 
 // TestExportTagsHandler tests exporting tags to CSV
 func TestExportTagsHandler(t *testing.T) {
-	// Setup: Clean database and create test data
-	db.Exec("DELETE FROM tags")
-	db.Exec("DELETE FROM users")
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
 
 	// Create test user
 	user := &User{ID: 1, Username: "testuser", IsAdmin: false}
@@ -698,9 +699,8 @@ func TestExportTagsHandler(t *testing.T) {
 
 // TestImportTagsHandler tests importing tags from CSV
 func TestImportTagsHandler(t *testing.T) {
-	// Setup: Clean database and create test user
-	db.Exec("DELETE FROM tags")
-	db.Exec("DELETE FROM users")
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
 
 	user := &User{ID: 1, Username: "testuser", IsAdmin: false}
 	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'testuser', 'hash', 0)")
@@ -736,11 +736,8 @@ Study,Study materials,#ffff00`
 
 // TestExportPasswordsHandler tests exporting passwords to CSV
 func TestExportPasswordsHandler(t *testing.T) {
-	// Setup: Clean database and create test data
-	db.Exec("DELETE FROM password_entries")
-	db.Exec("DELETE FROM users")
-	db.Exec("DELETE FROM tags")
-	db.Exec("DELETE FROM entry_tags")
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
 
 	// Create test user
 	user := &User{ID: 1, Username: "testuser", IsAdmin: false}
@@ -795,11 +792,8 @@ func TestExportPasswordsHandler(t *testing.T) {
 
 // TestImportPasswordsHandler tests importing passwords from CSV
 func TestImportPasswordsHandler(t *testing.T) {
-	// Setup: Clean database and create test user
-	db.Exec("DELETE FROM password_entries")
-	db.Exec("DELETE FROM users")
-	db.Exec("DELETE FROM tags")
-	db.Exec("DELETE FROM entry_tags")
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
 
 	user := &User{ID: 1, Username: "testuser", IsAdmin: false}
 	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'testuser', 'hash', 0)")
@@ -917,9 +911,8 @@ incomplete.com,user`
 
 // TestCheckPasswordDuplicateHandler tests the duplicate checking API
 func TestCheckPasswordDuplicateHandler(t *testing.T) {
-	// Setup: Clean database and create test data
-	db.Exec("DELETE FROM passwords")
-	db.Exec("DELETE FROM users")
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
 
 	user := &User{ID: 1, Username: "testuser", IsAdmin: false}
 	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'testuser', 'hash', 0)")
@@ -967,10 +960,8 @@ func TestCheckPasswordDuplicateHandler(t *testing.T) {
 
 // TestNewUserEmptyState tests that a newly created user has empty passwords and tags.
 func TestNewUserEmptyState(t *testing.T) {
-	// Setup: Clean database and create a fresh user
-	db.Exec("DELETE FROM password_entries")
-	db.Exec("DELETE FROM tags")
-	db.Exec("DELETE FROM users")
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
 
 	// Create a new user
 	newUser := &User{ID: 1, Username: "newuser", IsAdmin: false}
@@ -1053,9 +1044,8 @@ func TestLoginPageHandler(t *testing.T) {
 
 // TestLoginAuthentication tests comprehensive login scenarios
 func TestLoginAuthentication(t *testing.T) {
-	// Setup: Clean database and create test user
-	db.Exec("DELETE FROM login_attempts")
-	db.Exec("DELETE FROM users")
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
 
 	// Create a test user with properly hashed password
 	correctPassword := "correctpassword"
@@ -1156,9 +1146,8 @@ func TestLoginAuthentication(t *testing.T) {
 
 // TestLoginRateLimiting tests rate limiting functionality
 func TestLoginRateLimiting(t *testing.T) {
-	// Setup: Clean database and create test user
-	db.Exec("DELETE FROM login_attempts")
-	db.Exec("DELETE FROM users")
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
 
 	// Create user with properly hashed password
 	correctPassword := "correctpassword"
@@ -1229,9 +1218,8 @@ func TestLoginRateLimiting(t *testing.T) {
 
 // TestRateLimitCheckAPI tests the rate limit check API endpoint
 func TestRateLimitCheckAPI(t *testing.T) {
-	// Setup: Clean database
-	db.Exec("DELETE FROM login_attempts")
-	db.Exec("DELETE FROM users")
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB(t)
 
 	// Create user with properly hashed password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)

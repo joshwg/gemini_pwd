@@ -2,7 +2,6 @@
 package main
 
 import (
-	"database/sql"
 	"os"
 	"testing"
 
@@ -39,6 +38,9 @@ func TestCreateBaseDBFile(t *testing.T) {
 	const testDBFile = "test_create.db"
 	os.Remove(testDBFile) // Ensure it doesn't exist
 
+	// Save the current database connection
+	originalDB := db
+
 	// This is a simplified version of what main.go does
 	initDB(testDBFile) // This function doesn't return an error, it logs fatal
 
@@ -47,17 +49,10 @@ func TestCreateBaseDBFile(t *testing.T) {
 		t.Errorf("Expected database file '%s' to be created, but it was not", testDBFile)
 	}
 
-	// Clean up
+	// Clean up the test database
 	db.Close()
 	os.Remove(testDBFile)
 
-	// Re-initialize the in-memory db for other tests
-	var err error
-	db, err = sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("Failed to re-open in-memory database: %v", err)
-	}
-	if err := createSchema(); err != nil {
-		t.Fatalf("Failed to recreate database schema: %v", err)
-	}
+	// Restore the original in-memory database connection
+	db = originalDB
 }
