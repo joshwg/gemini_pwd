@@ -396,9 +396,49 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Default behavior: fetch all passwords (without decrypted password/notes)
-		query := r.URL.Query().Get("q")
-		passwords, err := getPasswords(currentUser.ID, query)
+		// Default behavior: fetch passwords with filtering support
+		var filter PasswordFilter
+
+		// Parse query parameter for text search
+		if query := r.URL.Query().Get("q"); query != "" {
+			filter.Query = query
+		}
+
+		// Parse tag filter parameters (comma-separated tag IDs)
+		if tagIDsParam := r.URL.Query().Get("tags"); tagIDsParam != "" {
+			tagIDStrs := strings.Split(tagIDsParam, ",")
+			for _, tagIDStr := range tagIDStrs {
+				if tagID, err := strconv.Atoi(strings.TrimSpace(tagIDStr)); err == nil {
+					filter.TagIDs = append(filter.TagIDs, tagID)
+				}
+			}
+		}
+
+		// Parse limit parameter
+		if limitParam := r.URL.Query().Get("limit"); limitParam != "" {
+			if limit, err := strconv.Atoi(limitParam); err == nil && limit > 0 {
+				filter.Limit = limit
+			}
+		}
+		if filter.Limit == 0 {
+			filter.Limit = 100 // Default limit
+		}
+
+		// Parse offset parameter for pagination
+		if offsetParam := r.URL.Query().Get("offset"); offsetParam != "" {
+			if offset, err := strconv.Atoi(offsetParam); err == nil && offset >= 0 {
+				filter.Offset = offset
+			}
+		}
+
+		// Only return passwords if filters are applied (for security)
+		if filter.Query == "" && len(filter.TagIDs) == 0 {
+			// Return empty array when no filters are specified
+			httputil.WriteJSON(w, []PasswordEntry{})
+			return
+		}
+
+		passwords, err := getPasswordsWithFilter(currentUser.ID, filter)
 		if err != nil {
 			logger.Error("Error retrieving passwords for user", err, "user_id", currentUser.ID)
 			httputil.InternalServerError(w, "Failed to retrieve passwords", err)

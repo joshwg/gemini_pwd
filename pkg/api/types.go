@@ -57,6 +57,14 @@ type UpdateTagRequest struct {
 	Color       string `json:"color"`
 }
 
+// Filter request types
+type PasswordFilterRequest struct {
+	Query  string `json:"query"`  // Text search for site/username
+	TagIDs []int  `json:"tagIds"` // Specific tag IDs to filter by
+	Limit  int    `json:"limit"`  // Maximum number of results (default 100)
+	Offset int    `json:"offset"` // Pagination offset (default 0)
+}
+
 // Common response types
 type RateLimitResponse struct {
 	IsLimited     bool `json:"isLimited"`

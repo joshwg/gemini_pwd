@@ -318,12 +318,33 @@ func deleteTag(userID int, tagID int) error {
 	return nil
 }
 
-// getPasswords retrieves a list of all passwords for a user, with optional filtering.
+// getPasswords retrieves a list of passwords for a user with filtering support.
 // Returns only metadata (no sensitive data) for client-side display.
 func getPasswords(userID int, query string) ([]PasswordEntry, error) {
-	var rows *sql.Rows
-	var err error
+	// Convert legacy string query to new filter format for backward compatibility
+	filter := PasswordFilter{
+		Query:  query,
+		TagIDs: []int{},
+		Limit:  100,
+		Offset: 0,
+	}
+	return getPasswordsWithFilter(userID, filter)
+}
 
+// PasswordFilter represents filtering options for password queries
+type PasswordFilter struct {
+	Query  string // Text search for site/username/tags
+	TagIDs []int  // Specific tag IDs to filter by
+	Limit  int    // Maximum number of results
+	Offset int    // Pagination offset
+}
+
+// getPasswordsWithFilter retrieves passwords with advanced filtering support
+func getPasswordsWithFilter(userID int, filter PasswordFilter) ([]PasswordEntry, error) {
+	var args []interface{}
+	var conditions []string
+
+	// Base query - always filter by user
 	sqlQuery := `
 		SELECT
 			pe.id, pe.site, pe.username, pe.created_at, pe.modified_at,
@@ -339,30 +360,64 @@ func getPasswords(userID int, query string) ([]PasswordEntry, error) {
 		WHERE
 			pe.user_id = ?
 	`
-	if query != "" {
-		sqlQuery += `
-			AND (
-				pe.site LIKE ? COLLATE NOCASE
-				OR pe.username LIKE ? COLLATE NOCASE
-				OR t.name LIKE ? COLLATE NOCASE
-			)
-		`
+	args = append(args, userID)
+
+	// Add text search condition
+	if filter.Query != "" {
+		conditions = append(conditions, `(
+			pe.site LIKE ? COLLATE NOCASE
+			OR pe.username LIKE ? COLLATE NOCASE
+			OR t.name LIKE ? COLLATE NOCASE
+		)`)
+		searchQuery := "%" + filter.Query + "%"
+		args = append(args, searchQuery, searchQuery, searchQuery)
 	}
+
+	// Add tag filter conditions
+	if len(filter.TagIDs) > 0 {
+		// For tag filtering, we need to ensure ALL specified tags are present
+		tagPlaceholders := make([]string, len(filter.TagIDs))
+		for i, tagID := range filter.TagIDs {
+			tagPlaceholders[i] = "?"
+			args = append(args, tagID)
+		}
+
+		// Use HAVING with COUNT to ensure all tags are matched
+		conditions = append(conditions, fmt.Sprintf(`pe.id IN (
+			SELECT et2.entry_id 
+			FROM entry_tags et2 
+			WHERE et2.tag_id IN (%s)
+			GROUP BY et2.entry_id 
+			HAVING COUNT(DISTINCT et2.tag_id) = %d
+		)`, strings.Join(tagPlaceholders, ","), len(filter.TagIDs)))
+	}
+
+	// Apply conditions
+	if len(conditions) > 0 {
+		sqlQuery += " AND " + strings.Join(conditions, " AND ")
+	}
+
+	// Group by and order
 	sqlQuery += `
 		GROUP BY
 			pe.id
 		ORDER BY
 			pe.site ASC
-		LIMIT 100
 	`
 
-	if query != "" {
-		searchQuery := "%" + query + "%"
-		rows, err = db.Query(sqlQuery, userID, searchQuery, searchQuery, searchQuery)
-	} else {
-		rows, err = db.Query(sqlQuery, userID)
+	// Add pagination
+	if filter.Limit <= 0 {
+		filter.Limit = 100 // Default limit
+	}
+	sqlQuery += " LIMIT ?"
+	args = append(args, filter.Limit)
+
+	if filter.Offset > 0 {
+		sqlQuery += " OFFSET ?"
+		args = append(args, filter.Offset)
 	}
 
+	rows, err := db.Query(sqlQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query passwords: %w", err)
 	}

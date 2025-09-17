@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"gemini_pwd/pkg/httputil"
 	"net"
 	"net/http"
 	"strings"
@@ -305,10 +306,29 @@ func securityHeaders(next http.HandlerFunc) http.HandlerFunc {
 } // authMiddleware protects routes that require authentication using database sessions
 func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return securityHeaders(func(w http.ResponseWriter, r *http.Request) {
+		// Helper function to detect AJAX requests
+		isAjaxRequest := func(r *http.Request) bool {
+			// Check for common AJAX indicators
+			if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+				return true
+			}
+			// Check if request path starts with /api/
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				return true
+			}
+			// Check Accept header for JSON preference
+			accept := r.Header.Get("Accept")
+			return strings.Contains(accept, "application/json")
+		}
+
 		c, err := r.Cookie("session_token")
 		if err != nil {
 			if err == http.ErrNoCookie {
-				http.Redirect(w, r, "/", http.StatusFound)
+				if isAjaxRequest(r) {
+					httputil.Unauthorized(w, "Authentication required")
+				} else {
+					http.Redirect(w, r, "/", http.StatusFound)
+				}
 				return
 			}
 			http.Error(w, "Bad request", http.StatusBadRequest)
@@ -318,7 +338,11 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		user, err := validateSession(c.Value)
 		if err != nil {
 			clearSession(w, r)
-			http.Redirect(w, r, "/?reason=session_expired", http.StatusFound)
+			if isAjaxRequest(r) {
+				httputil.Unauthorized(w, "Session expired")
+			} else {
+				http.Redirect(w, r, "/?reason=session_expired", http.StatusFound)
+			}
 			return
 		}
 

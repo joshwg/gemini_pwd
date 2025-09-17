@@ -197,6 +197,39 @@
     const API_ORIGIN = window.location.origin;
     const DEFAULT_TAG_COLOR = '#6B7280'; // dark gray - matches backend defaultTagColor
     
+    // Global authentication handler for AJAX requests
+    async function handleAuthResponse(response) {
+        // Check for authentication errors
+        if (response.status === 401 || response.status === 403) {
+            alert('Your session has expired. You will be redirected to the login page.');
+            window.location.href = '/logout';
+            return null;
+        }
+        
+        // Check if response is HTML (likely a redirect to login page)
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('text/html') && !response.ok) {
+            // If we got HTML when expecting JSON, it's likely a redirect to login
+            alert('Your session has expired. You will be redirected to the login page.');
+            window.location.href = '/logout';
+            return null;
+        }
+        
+        return response;
+    }
+    
+    // Enhanced fetch function that handles authentication
+    async function authFetch(url, options = {}) {
+        try {
+            const response = await fetch(url, options);
+            const authResponse = await handleAuthResponse(response);
+            return authResponse;
+        } catch (error) {
+            console.error('Fetch error:', error);
+            throw error;
+        }
+    }
+    
     // Utility function to get tag color with fallback to default
     function getTagColor(color) {
         return color && color.trim() !== '' ? color : DEFAULT_TAG_COLOR;
@@ -281,11 +314,10 @@
         
         // Tag filtering state
         let selectedTagFilterIds = new Set();
-        let allPasswords = []; // Store all passwords for client-side filtering
         
-        // Fetch and render passwords and tags on page load
-        fetchPasswords();
+        // Fetch tags and show initial empty state on page load
         fetchTags();
+        showEmptyFilterState(); // Show the filter prompt instead of loading passwords
 
         // Search functionality
         searchPasswordInput.addEventListener('keyup', () => {
@@ -299,32 +331,74 @@
             applyFilters();
         });
 
-        // Function to apply both text search and tag filters
-        function applyFilters() {
+        // Function to check if any filters are currently active
+        function hasActiveFilters() {
             const searchQuery = searchPasswordInput.value.toLowerCase().trim();
+            return searchQuery !== '' || selectedTagFilterIds.size > 0;
+        }
+
+        // Function to fetch passwords with server-side filtering
+        async function fetchFilteredPasswords() {
+            if (!hasActiveFilters()) {
+                showEmptyFilterState();
+                return;
+            }
             
-            let filteredPasswords = allPasswords.filter(password => {
-                // Text search - check site and username
-                const matchesText = !searchQuery || 
-                    password.site.toLowerCase().includes(searchQuery) ||
-                    password.username.toLowerCase().includes(searchQuery);
+            try {
+                // Build query parameters for server-side filtering
+                const params = new URLSearchParams();
                 
-                // Tag filter - all selected tags must be present
-                const matchesTags = selectedTagFilterIds.size === 0 || 
-                    Array.from(selectedTagFilterIds).every(tagId => 
-                        password.tags.some(tag => tag.id.toString() === tagId)
-                    );
+                // Add text search parameter
+                const searchQuery = searchPasswordInput.value.trim();
+                if (searchQuery) {
+                    params.append('q', searchQuery);
+                }
                 
-                return matchesText && matchesTags;
-            });
-            
-            renderPasswords(filteredPasswords);
+                // Add tag filter parameters
+                if (selectedTagFilterIds.size > 0) {
+                    params.append('tags', Array.from(selectedTagFilterIds).join(','));
+                }
+                
+                // Add limit parameter
+                params.append('limit', '100');
+                
+                const response = await authFetch(API_ORIGIN + '/api/passwords?' + params.toString());
+                if (!response) return; // Auth error handled by authFetch
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error('Failed to fetch passwords: ' + response.status + ' ' + response.statusText + ' - ' + errorText);
+                }
+                const passwords = await response.json() || [];
+                renderPasswords(passwords);
+            } catch (e) {
+                console.error('Error in fetchFilteredPasswords:', e);
+                alert('Could not fetch passwords. See console for details.');
+            }
+        }
+
+        // Function to apply both text search and tag filters (now uses server-side filtering)
+        async function applyFilters() {
+            await fetchFilteredPasswords();
+        }
+
+        // Function to show empty state when no filters are applied
+        function showEmptyFilterState() {
+            passwordCardContainer.innerHTML = '';
+            const emptyCard = document.createElement('div');
+            emptyCard.className = 'bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg p-8 text-center';
+            emptyCard.innerHTML = 
+                '<div class="flex flex-col items-center">' +
+                    '<i class="fas fa-search text-4xl text-blue-300 mb-4"></i>' +
+                    '<p class="text-lg font-medium text-blue-600 mb-2">Apply filters to view passwords</p>' +
+                    '<p class="text-sm text-blue-500">Select a tag or search by site/username to see your passwords</p>' +
+                '</div>';
+            passwordCardContainer.appendChild(emptyCard);
         }
 
         // Function to check for duplicate passwords via API
         async function checkPasswordDuplicate(site, username, id = null) {
             try {
-                const response = await fetch('/api/passwords/check-duplicate', {
+                const response = await authFetch('/api/passwords/check-duplicate', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -336,6 +410,7 @@
                     })
                 });
                 
+                if (!response) return false; // Auth error handled by authFetch
                 if (!response.ok) {
                     // Log the error but don't throw - return false to allow form submission
                     console.error('Duplicate check failed:', response.status, response.statusText);
@@ -412,16 +487,17 @@
             }
             const url = passwordID.value ? (API_ORIGIN + '/api/passwords?id=' + passwordID.value) : (API_ORIGIN + '/api/passwords');
 
-            const response = await fetch(url, {
+            const response = await authFetch(url, {
                 method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
 
+            if (!response) return; // Auth error handled by authFetch
             if (response.ok) {
                 console.log('Password saved successfully!');
                 passwordModal.classList.add('hidden');
-                fetchPasswords();
+                await applyFilters(); // Use the new server-side filtering approach
             } else {
                 console.error('Failed to save password.');
                 const errorText = await response.text();
@@ -434,9 +510,10 @@
             if (e.target.closest('.delete-password-btn')) {
                 const id = e.target.closest('.delete-password-btn').dataset.id;
                 if (confirm('Are you sure you want to delete this password?')) {
-                    const response = await fetch(API_ORIGIN + '/api/passwords?id=' + id, { method: 'DELETE' });
+                    const response = await authFetch(API_ORIGIN + '/api/passwords?id=' + id, { method: 'DELETE' });
+                    if (!response) return; // Auth error handled by authFetch
                     if (response.ok) {
-                        fetchPasswords();
+                        await applyFilters(); // Use the new server-side filtering approach
                     } else {
                         alert('Failed to delete password.');
                     }
@@ -710,26 +787,11 @@
             return true; // Tag successfully added
         }
 
-        // Helper functions
-        async function fetchPasswords() {
-            try {
-                const response = await fetch(API_ORIGIN + '/api/passwords');
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error('Failed to fetch passwords: ' + response.status + ' ' + response.statusText + ' - ' + errorText);
-                }
-                const passwords = await response.json() || [];
-                allPasswords = passwords;
-                applyFilters(); // Apply current filters instead of rendering directly
-            } catch (e) {
-                console.error('Error in fetchPasswords:', e);
-                alert('Could not fetch passwords. See console for details.');
-            }
-        }
-        
+        // Helper functions        
         async function fetchPasswordByID(id) {
             try {
-                const response = await fetch(API_ORIGIN + '/api/passwords?id=' + id);
+                const response = await authFetch(API_ORIGIN + '/api/passwords?id=' + id);
+                if (!response) return; // Auth error handled by authFetch
                 if (!response.ok) throw new Error('Failed to fetch password.');
                 const password = await response.json();
                 passwordModalTitle.textContent = 'Edit Password';
@@ -800,7 +862,8 @@
 
         async function fetchTags() {
             try {
-                const response = await fetch(API_ORIGIN + '/api/tags');
+                const response = await authFetch(API_ORIGIN + '/api/tags');
+                if (!response) return; // Auth error handled by authFetch
                 if (!response.ok) {
                     const errorText = await response.text();
                     throw new Error('Failed to fetch tags: ' + response.status + ' ' + response.statusText + ' - ' + errorText);
@@ -1010,7 +1073,8 @@
         
         async function copyPassword(id) {
             try {
-                const response = await fetch(API_ORIGIN + '/api/passwords?id=' + id + '&action=copy');
+                const response = await authFetch(API_ORIGIN + '/api/passwords?id=' + id + '&action=copy');
+                if (!response) return; // Auth error handled by authFetch
                 if (!response.ok) throw new Error('Failed to fetch password for copying.');
                 const password = await response.text();
                 
@@ -1060,7 +1124,8 @@
             if (passwordInput.type === 'password') {
                 // Show password - fetch and display
                 try {
-                    const response = await fetch(API_ORIGIN + '/api/passwords?id=' + id + '&action=copy');
+                    const response = await authFetch(API_ORIGIN + '/api/passwords?id=' + id + '&action=copy');
+                    if (!response) return; // Auth error handled by authFetch
                     if (!response.ok) throw new Error('Failed to fetch password.');
                     const password = await response.text();
                     passwordInput.value = password;
@@ -1090,7 +1155,8 @@
                 if (notesContent.placeholder === 'Loading notes...') {
                     notesContent.value = 'Loading...';
                     try {
-                        const response = await fetch(API_ORIGIN + '/api/passwords?id=' + id);
+                        const response = await authFetch(API_ORIGIN + '/api/passwords?id=' + id);
+                        if (!response) return; // Auth error handled by authFetch
                         if (response.ok) {
                             const password = await response.json();
                             const notesText = password.notes && password.notes.trim() ? password.notes : 'No notes available';
