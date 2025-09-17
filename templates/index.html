@@ -11,7 +11,7 @@
                 Clear
             </button>
         </div>
-        <div id="tagFilterList" class="space-y-1 max-h-96 overflow-y-auto">
+        <div id="tagFilterList" class="space-y-1 max-h-[36rem] overflow-y-auto">
             <!-- Tag filter list will be populated here -->
         </div>
     </div>
@@ -894,18 +894,17 @@
                 const textColor = getTextColor(tagColor);
                 const isSelected = selectedTagFilterIds.has(tag.id.toString());
                 
-                const tagElement = document.createElement('div');
+                const tagElement = document.createElement('span');
                 
                 if (isSelected) {
-                    // Selected tags: darker background, white text, thick border
-                    tagElement.className = 'tag-filter-item cursor-pointer text-xs font-bold py-2 px-3 rounded border-2 transition-all shadow-md transform scale-105';
+                    // Selected tags: keep the same compact style but with selection styling
+                    tagElement.className = 'tag-filter-item cursor-pointer text-xs font-semibold inline-block py-0.5 px-2 rounded border mr-1 mb-1 ring-2 ring-blue-500 ring-opacity-50';
                     tagElement.style.backgroundColor = '#1e40af'; // Blue-800
                     tagElement.style.color = '#ffffff';
-                    tagElement.style.borderColor = '#1d4ed8'; // Blue-700
-                    tagElement.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
+                    tagElement.style.border = '1px solid #1d4ed8'; // Blue-700
                 } else {
-                    // Unselected tags: original colors, hover effects
-                    tagElement.className = 'tag-filter-item cursor-pointer text-xs font-semibold py-1 px-2 rounded border transition-all hover:opacity-80 hover:shadow-sm';
+                    // Unselected tags: exact same style as password card tags
+                    tagElement.className = 'tag-filter-item cursor-pointer text-xs font-semibold inline-block py-0.5 px-2 rounded border mr-1 mb-1 hover:opacity-80 transition-all';
                     tagElement.style.backgroundColor = tagColor;
                     tagElement.style.color = textColor;
                     tagElement.style.border = getBorderStyle(tagColor);
