@@ -612,7 +612,7 @@ func testSQLInjectionAttempts(t *testing.T) {
 				var response map[string]interface{}
 				json.Unmarshal(w.Body.Bytes(), &response)
 				errorMsg := response["error"].(string)
-				
+
 				// If it's not a "already exists" error, it might be SQL injection
 				if !strings.Contains(errorMsg, "already exists") {
 					t.Errorf("SQL injection in tag creation caused unexpected server error: %s (payload: %s)", errorMsg, payload)

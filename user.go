@@ -302,7 +302,7 @@ func updateTag(userID int, tagID int, newName, newDescription, newColor string) 
 	if err != nil {
 		return fmt.Errorf("failed to update tag: %w", err)
 	}
-	
+
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to check update result: %w", err)
@@ -310,7 +310,7 @@ func updateTag(userID int, tagID int, newName, newDescription, newColor string) 
 	if rowsAffected == 0 {
 		return fmt.Errorf("tag not found or you don't have permission to update it")
 	}
-	
+
 	return nil
 }
 

@@ -17,18 +17,15 @@ import (
 var encryptionKey []byte
 
 func init() {
+
 	keyStr := os.Getenv("PWD_SECRET_KEY")
 	if keyStr == "" {
-		keyStr = "ThisIsASecretKeyYouShouldReplace"
-		logger.Warning("Using default encryption key! Set PWD_SECRET_KEY environment variable in production!")
-		logger.Warning("Default key should NEVER be used in production - generate a secure 32-byte key")
-	} else {
-		logger.Success("Using custom PWD_SECRET_KEY from environment variable")
+		logger.Fatal("PWD_SECRET_KEY environment variable is not set. Refusing to start. You must provide a secure 32-byte key.", fmt.Errorf("missing key"))
 	}
 
-	// AES-256 requires a 32-byte key. We'll panic on startup if the key is not the correct size.
+	// AES-256 requires a 32-byte key. Refuse to start if the key is not the correct size.
 	if len(keyStr) != 32 {
-		logger.Fatal("Invalid PWD_SECRET_KEY length: must be exactly 32 bytes, but got %d bytes", fmt.Errorf("wrong key length"), len(keyStr))
+		logger.Fatal("Invalid PWD_SECRET_KEY length: must be exactly 32 bytes, but got %d bytes. Refusing to start.", fmt.Errorf("wrong key length"), len(keyStr))
 	}
 
 	encryptionKey = []byte(keyStr)
