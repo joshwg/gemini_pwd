@@ -747,17 +747,28 @@ func updatePasswordEntry(userID, id int, site, username, password, notes string,
 	}
 
 	// Update the password entry
-	encryptedPassword, err := encrypt([]byte(password), salt)
-	if err != nil {
-		return fmt.Errorf("failed to encrypt password: %w", err)
-	}
+	// If password is empty, only update non-password fields (keep existing password)
 	encryptedNotes, err := encrypt([]byte(notes), salt)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt notes: %w", err)
 	}
-	_, err = tx.Exec("UPDATE password_entries SET site = ?, username = ?, password_encrypted = ?, notes_encrypted = ?, modified_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?", site, username, encryptedPassword, encryptedNotes, id, userID)
-	if err != nil {
-		return fmt.Errorf("failed to update password entry: %w", err)
+
+	if password != "" {
+		// Update with new password
+		encryptedPassword, err := encrypt([]byte(password), salt)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt password: %w", err)
+		}
+		_, err = tx.Exec("UPDATE password_entries SET site = ?, username = ?, password_encrypted = ?, notes_encrypted = ?, modified_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?", site, username, encryptedPassword, encryptedNotes, id, userID)
+		if err != nil {
+			return fmt.Errorf("failed to update password entry: %w", err)
+		}
+	} else {
+		// Update without changing password (keep existing password)
+		_, err = tx.Exec("UPDATE password_entries SET site = ?, username = ?, notes_encrypted = ?, modified_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?", site, username, encryptedNotes, id, userID)
+		if err != nil {
+			return fmt.Errorf("failed to update password entry: %w", err)
+		}
 	}
 
 	// Clear existing tags for the password entry

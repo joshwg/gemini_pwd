@@ -377,12 +377,13 @@
             };
 
             try {
-                const response = await fetch(`${window.location.origin}/api/users`, {
+                const response = await authFetch(`${window.location.origin}/api/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
 
+                if (!response) return; // Auth error handled by authFetch
                 if (response.ok) {
                     console.log('User created successfully!');
                     e.target.reset(); // Clear form fields
@@ -411,9 +412,10 @@
             if (e.target.closest('.delete-btn')) {
                 const username = e.target.closest('.delete-btn').dataset.username;
                 if (confirm(`Are you sure you want to delete user "${username}"?`)) {
-                    const response = await fetch(`${window.location.origin}/api/users?username=${username}`, {
+                    const response = await authFetch(`${window.location.origin}/api/users?username=${username}`, {
                         method: 'DELETE'
                     });
+                    if (!response) return; // Auth error handled by authFetch
 
                     if (response.ok) {
                         console.log('User deleted successfully!');
@@ -469,7 +471,7 @@
             // Update username if it has changed
             if (newUsername !== currentUsername) {
                 const renamePayload = { username: currentUsername, newUsername: newUsername };
-                const renamePromise = fetch(`${window.location.origin}/api/users`, {
+                const renamePromise = authFetch(`${window.location.origin}/api/users`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(renamePayload)
@@ -479,7 +481,7 @@
 
             // Always update admin status
             const adminPayload = { username: newUsername, isAdmin: isAdmin };
-            const adminPromise = fetch(`${window.location.origin}/api/users`, {
+            const adminPromise = authFetch(`${window.location.origin}/api/users`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(adminPayload)
@@ -527,11 +529,13 @@
             };
 
             try {
-                const response = await fetch(`${window.location.origin}/api/users`, {
+                const response = await authFetch(`${window.location.origin}/api/users`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
+
+                if (!response) return; // Auth error handled by authFetch
 
                 if (response.ok) {
                     console.log('Password changed successfully!');
@@ -610,7 +614,8 @@
         // Function to fetch users and populate the table
         async function fetchUsers() {
             try {
-                const response = await fetch(`${window.location.origin}/api/users`);
+                const response = await authFetch(`${window.location.origin}/api/users`);
+                if (!response) return; // Auth error handled by authFetch
                 if (!response.ok) {
                     throw new Error('Failed to fetch users');
                 }

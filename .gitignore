@@ -19,8 +19,7 @@ main.exe
 *.dylib
 
 # Build output directory
-bin/
-/bin/
+bin/*
 
 # Go build artifacts
 *.test

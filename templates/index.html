@@ -195,45 +195,6 @@
 
 <script>
     const API_ORIGIN = window.location.origin;
-    const DEFAULT_TAG_COLOR = '#6B7280'; // dark gray - matches backend defaultTagColor
-    
-    // Global authentication handler for AJAX requests
-    async function handleAuthResponse(response) {
-        // Check for authentication errors
-        if (response.status === 401 || response.status === 403) {
-            alert('Your session has expired. You will be redirected to the login page.');
-            window.location.href = '/logout';
-            return null;
-        }
-        
-        // Check if response is HTML (likely a redirect to login page)
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('text/html') && !response.ok) {
-            // If we got HTML when expecting JSON, it's likely a redirect to login
-            alert('Your session has expired. You will be redirected to the login page.');
-            window.location.href = '/logout';
-            return null;
-        }
-        
-        return response;
-    }
-    
-    // Enhanced fetch function that handles authentication
-    async function authFetch(url, options = {}) {
-        try {
-            const response = await fetch(url, options);
-            const authResponse = await handleAuthResponse(response);
-            return authResponse;
-        } catch (error) {
-            console.error('Fetch error:', error);
-            throw error;
-        }
-    }
-    
-    // Utility function to get tag color with fallback to default
-    function getTagColor(color) {
-        return color && color.trim() !== '' ? color : DEFAULT_TAG_COLOR;
-    }
 
     document.addEventListener('DOMContentLoaded', () => {
         const passwordCardContainer = document.getElementById('passwordCardContainer');
@@ -261,56 +222,6 @@
 
         let allTags = [];
         let draggedTag = null;
-        
-        // Function to determine text color based on background color brightness
-        function getTextColor(backgroundColor) {
-            // Convert hex to RGB
-            const hex = backgroundColor.replace('#', '');
-            const r = parseInt(hex.substr(0, 2), 16);
-            const g = parseInt(hex.substr(2, 2), 16);
-            const b = parseInt(hex.substr(4, 2), 16);
-            
-            // Calculate brightness using relative luminance formula
-            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-            
-            // Return black for light colors, white for dark colors
-            return brightness > 155 ? '#000000' : '#FFFFFF';
-        }
-        
-        // Function to get border style for tags based on background brightness
-        function getBorderStyle(backgroundColor) {
-            // Convert hex to RGB
-            const hex = backgroundColor.replace('#', '');
-            const r = parseInt(hex.substr(0, 2), 16);
-            const g = parseInt(hex.substr(2, 2), 16);
-            const b = parseInt(hex.substr(4, 2), 16);
-            
-            // Calculate brightness using relative luminance formula
-            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-            
-            // For very light colors (brightness > 220), use a darker border
-            if (brightness > 220) {
-                return '2px solid #666666'; // Dark gray border for very light tags
-            } else if (brightness > 180) {
-                return '1px solid #777777'; // Medium gray border for light tags
-            } else {
-                return '1px solid #eeeeee'; // Light gray border for darker tags
-            }
-        }
-        
-        // Function to sort tags alphabetically within a container
-        function sortTagsInContainer(container) {
-            const tags = Array.from(container.querySelectorAll('.tag-item'));
-            tags.sort((a, b) => {
-                const nameA = a.dataset.name.toLowerCase();
-                const nameB = b.dataset.name.toLowerCase();
-                return nameA.localeCompare(nameB);
-            });
-            
-            // Remove all tags and re-add them in sorted order
-            tags.forEach(tag => tag.remove());
-            tags.forEach(tag => container.appendChild(tag));
-        }
         
         // Tag filtering state
         let selectedTagFilterIds = new Set();
@@ -798,6 +709,7 @@
                 passwordID.value = password.id;
                 passwordSite.value = password.site;
                 passwordUsername.value = password.username;
+                passwordValue.value = ''; // Clear password field for security
                 passwordNotes.value = password.notes;
                 
                 // Clear and populate tags
@@ -1158,8 +1070,13 @@
                         if (!response) return; // Auth error handled by authFetch
                         if (response.ok) {
                             const password = await response.json();
-                            const notesText = password.notes && password.notes.trim() ? password.notes : 'No notes available';
-                            notesContent.value = notesText;
+                            if (password.notes && password.notes.trim()) {
+                                notesContent.value = password.notes;
+                                notesContent.classList.remove('italic', 'text-gray-400', 'select-none');
+                            } else {
+                                notesContent.value = 'No notes available';
+                                notesContent.classList.add('italic', 'text-gray-400', 'select-none');
+                            }
                             notesContent.placeholder = '';
                         } else {
                             notesContent.value = 'Failed to load notes';

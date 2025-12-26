@@ -11,6 +11,9 @@
     
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    
+    <!-- Utility functions -->
+    <script src="/static/utils.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div x-data="{ open: false }" @keydown.escape="open = false" class="bg-gray-800 text-white">
@@ -271,12 +274,13 @@
                     };
 
                     try {
-                        const response = await fetch('/api/change-password', {
+                        const response = await authFetch('/api/change-password', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(data),
                         });
 
+                        if (!response) return; // Auth error handled by authFetch
                         if (response.ok) {
                             alert('Password changed successfully!');
                             changeMyPasswordModal.classList.add('hidden');
@@ -374,11 +378,12 @@
                     const action = importForm.action;
 
                     try {
-                        const response = await fetch(action, {
+                        const response = await authFetch(action, {
                             method: 'POST',
                             body: formData,
                         });
 
+                        if (!response) return; // Auth error handled by authFetch
                         if (response.ok) {
                             const resultText = await response.text();
                             alert(resultText);
