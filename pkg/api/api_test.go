@@ -1,4 +1,6 @@
 // Package api tests
+// Copyright (C) 2025 Joshua Goldstein
+
 package api
 
 import (

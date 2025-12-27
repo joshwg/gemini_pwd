@@ -1,4 +1,5 @@
 #!/bin/bash
+# Copyright (C) 2025 Joshua Goldstein
 
 # Gemini PWD Deployment Script
 # Run this script as root or with sudo

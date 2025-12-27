@@ -1,4 +1,6 @@
 // Package api provides common API utility functions
+// Copyright (C) 2025 Joshua Goldstein
+
 package api
 
 import (

@@ -1,4 +1,6 @@
 // Package httputil provides HTTP utility functions for consistent response handling
+// Copyright (C) 2025 Joshua Goldstein
+
 package httputil
 
 import (

@@ -1,3 +1,5 @@
+// Copyright (C) 2025 Joshua Goldstein
+
 // Package validation provides input validation utilities
 package validation
 

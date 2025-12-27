@@ -1,3 +1,5 @@
+-- Copyright (C) 2025 Joshua Goldstein
+
 -- MARIA DB syntax
 
 -- You will need to be running as a user that can create a database and TABLESPACE

@@ -1,4 +1,6 @@
 // Package httputil tests
+// Copyright (C) 2025 Joshua Goldstein
+
 package httputil
 
 import (

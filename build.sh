@@ -1,4 +1,5 @@
 #!/bin/bash
+# Copyright (C) 2025 Joshua Goldstein
 
 # build.sh - Build script for Gemini PWD
 # Usage: ./build.sh [target] [options]

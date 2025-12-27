@@ -1,3 +1,5 @@
+// Copyright (C) 2025 Joshua Goldstein
+
 // models.go
 package main
 

@@ -1,3 +1,5 @@
+// Copyright (C) 2025 Joshua Goldstein
+
 // Package api provides common API request and response types
 package api
 

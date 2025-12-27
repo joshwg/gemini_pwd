@@ -1,5 +1,7 @@
 // extra_security_test.go
 // Additional security and validation tests for Gemini PWD
+// Copyright (C) 2025 Joshua Goldstein
+
 package main
 
 import (

@@ -1,3 +1,5 @@
+// Copyright (C) 2025 Joshua Goldstein
+
 // Gemini PWD Utility Functions
 // Shared functions used across multiple templates
 

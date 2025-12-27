@@ -1,4 +1,6 @@
 // Package logger provides structured logging utilities with consistent formatting
+// Copyright (C) 2025 Joshua Goldstein
+
 package logger
 
 import (

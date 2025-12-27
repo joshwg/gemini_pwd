@@ -1,4 +1,6 @@
 // security_test.go - Penetration testing suite for authentication and authorization
+// Copyright (C) 2025 Joshua Goldstein
+
 package main
 
 import (

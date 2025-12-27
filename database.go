@@ -1,3 +1,5 @@
+// Copyright (C) 2025 Joshua Goldstein
+
 // database.go
 package main
 

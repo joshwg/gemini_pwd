@@ -1,4 +1,6 @@
 // Package logger tests
+// Copyright (C) 2025 Joshua Goldstein
+
 package logger
 
 import (

@@ -1,4 +1,5 @@
 #!/bin/bash
+# Copyright (C) 2025 Joshua Goldstein
 
 # Build script for gemini_pwd deployment
 # This script builds the application for Linux deployment

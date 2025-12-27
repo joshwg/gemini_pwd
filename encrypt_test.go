@@ -1,3 +1,5 @@
+// Copyright (C) 2025 Joshua Goldstein
+
 // encrypt_test.go
 package main
 

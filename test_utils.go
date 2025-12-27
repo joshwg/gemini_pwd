@@ -1,3 +1,5 @@
+// Copyright (C) 2025 Joshua Goldstein
+
 // test_utils.go
 package main
 

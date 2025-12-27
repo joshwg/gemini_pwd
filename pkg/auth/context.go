@@ -1,4 +1,6 @@
 // Package auth provides authentication and authorization utilities
+// Copyright (C) 2025 Joshua Goldstein
+
 package auth
 
 import (

@@ -1,3 +1,4 @@
+// Copyright (C) 2025 Joshua Goldstein
 // Package template provides template rendering utilities
 package template
 
