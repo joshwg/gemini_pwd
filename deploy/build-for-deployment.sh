@@ -25,6 +25,8 @@ GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o deploy/package/gemini_pwd .
 echo "Copying application files..."
 cp -r templates deploy/package/
 cp -r static deploy/package/
+# Remove test.html from deployment
+rm -f deploy/package/templates/test.html
 cp create_base_db.sql deploy/package/
 cp README.md deploy/package/
 

@@ -64,7 +64,7 @@ func main() {
 	mux.HandleFunc("/", securityHeaders(loginHandler))
 	mux.HandleFunc("/login", securityHeaders(loginHandler))
 	mux.HandleFunc("/api/rate-limit-check", securityHeaders(rateLimitCheckHandler))
-	mux.HandleFunc("/test", securityHeaders(testHandler))
+	// mux.HandleFunc("/test", securityHeaders(testHandler)) // Disabled for production
 
 	// Protected routes (require authentication) - auth middleware already includes security headers
 	mux.HandleFunc("/dashboard", authMiddleware(dashboardHandler))

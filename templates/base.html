@@ -520,12 +520,15 @@
             // Idle timeout functionality (30 minutes)
             let idleTimer;
             let warningTimer;
+            let confirmDeadlineTimer;
             const IDLE_TIME = 30 * 60 * 1000; // 30 minutes in milliseconds
             const WARNING_TIME = 5 * 60 * 1000; // 5 minutes warning before logout
+            const CONFIRM_DEADLINE = 10 * 60 * 1000; // 10 minutes to respond to warning
             
             function resetIdleTimer() {
                 clearTimeout(idleTimer);
                 clearTimeout(warningTimer);
+                clearTimeout(confirmDeadlineTimer);
                 
                 // Set warning timer (25 minutes)
                 warningTimer = setTimeout(showIdleWarning, IDLE_TIME - WARNING_TIME);
@@ -535,9 +538,26 @@
             }
             
             function showIdleWarning() {
+                // Set a deadline for responding to the warning (10 minutes max)
+                const warningShownAt = Date.now();
+                confirmDeadlineTimer = setTimeout(() => {
+                    logoutUser();
+                }, CONFIRM_DEADLINE);
+                
                 const userConfirmed = confirm('You will be logged out in 5 minutes due to inactivity. Click OK to stay logged in.');
+                const responseTime = Date.now() - warningShownAt;
+                
+                // Clear the deadline timer
+                clearTimeout(confirmDeadlineTimer);
+                
+                // If user took more than 10 minutes to respond, logout anyway
+                if (responseTime >= CONFIRM_DEADLINE) {
+                    logoutUser();
+                    return;
+                }
+                
                 if (userConfirmed) {
-                    resetIdleTimer(); // Reset timer if user wants to stay
+                    resetIdleTimer(); // Reset timer if user wants to stay and responded in time
                 }
             }
             

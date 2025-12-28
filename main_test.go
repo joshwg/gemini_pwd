@@ -16,9 +16,6 @@ import (
 // TestMain is the entry point for testing. It sets up an in-memory SQLite database
 // and runs the tests.
 func TestMain(m *testing.M) {
-	// Set a secure key for tests (required by encrypt.go)
-	os.Setenv("PWD_SECRET_KEY", "12345678901234567890123456789012") // 32 bytes
-
 	// Use an in-memory SQLite database for testing
 	var err error
 	db, err = sql.Open("sqlite3", ":memory:")

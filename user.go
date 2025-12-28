@@ -4,7 +4,6 @@
 package main
 
 import (
-	"crypto/rand"
 	"database/sql"
 	"fmt"
 	"strconv"
@@ -12,9 +11,6 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 )
-
-// Default color for tags imported without a color
-const defaultTagColor = "#6B7280" // dark gray
 
 // updateEmptyTagColors updates all tags with empty colors to use the default color
 func updateEmptyTagColors() error {
@@ -291,12 +287,11 @@ func createOrUpdateTag(userID int, name, description, color string) error {
 // updateTag updates an existing tag's name, description, and color.
 func updateTag(userID int, tagID int, newName, newDescription, newColor string) error {
 	// Check for existing tag case-insensitively, excluding the current tag.
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM tags WHERE user_id = ? AND name = ? COLLATE NOCASE AND id != ?", userID, newName, tagID).Scan(&count)
+	exists, err := CheckDuplicateTag(userID, newName, tagID)
 	if err != nil {
 		return fmt.Errorf("failed to check for existing tag: %w", err)
 	}
-	if count > 0 {
+	if exists {
 		return fmt.Errorf("tag '%s' already exists", newName)
 	}
 
@@ -444,26 +439,7 @@ func getPasswordsWithFilter(userID int, filter PasswordFilter) ([]PasswordEntry,
 		}
 
 		// Parse tags into proper Tag objects
-		if tagNames.Valid && tagIDs.Valid && tagColors.Valid {
-			tagIDStrings := strings.Split(tagIDs.String, ",")
-			tagNameStrings := strings.Split(tagNames.String, ",")
-			tagColorStrings := strings.Split(tagColors.String, ",")
-
-			p.Tags = make([]Tag, 0, len(tagNameStrings))
-			for i, name := range tagNameStrings {
-				if i < len(tagIDStrings) && i < len(tagColorStrings) {
-					if id, err := strconv.Atoi(tagIDStrings[i]); err == nil {
-						p.Tags = append(p.Tags, Tag{
-							ID:    id,
-							Name:  name,
-							Color: tagColorStrings[i],
-						})
-					}
-				}
-			}
-		} else {
-			p.Tags = []Tag{}
-		}
+		p.Tags = ParseTagsFromGroupConcat(tagIDs, tagNames, tagColors)
 
 		// Set empty strings for sensitive data - they should not be sent to client
 		p.Password = ""
@@ -570,30 +546,18 @@ func getDecryptedNotes(userID, passwordID int) (string, error) {
 // createPasswordEntry creates a new password entry.
 func createPasswordEntry(userID int, site, username, password, notes string, tagNames []string) error {
 	// Check for existing password entry (unique by site and username)
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM password_entries WHERE user_id = ? AND site = ? AND username = ? COLLATE NOCASE", userID, site, username).Scan(&count)
+	exists, err := CheckDuplicatePasswordEntry(userID, site, username)
 	if err != nil {
 		return fmt.Errorf("failed to check for existing password entry: %w", err)
 	}
-	if count > 0 {
+	if exists {
 		return fmt.Errorf("password entry for site '%s' and username '%s' already exists", site, username)
 	}
 
-	// Generate a unique salt for this entry
-	salt := make([]byte, 16)
-	if _, err := rand.Read(salt); err != nil {
-		return fmt.Errorf("failed to generate salt: %w", err)
-	}
-
-	// First, encrypt the sensitive data using the new salt
-	encryptedPassword, err := encrypt([]byte(password), salt)
+	// Encrypt the sensitive data with a new salt
+	encryptedData, err := EncryptPasswordData(password, notes)
 	if err != nil {
-		return fmt.Errorf("failed to encrypt password: %w", err)
-	}
-
-	encryptedNotes, err := encrypt([]byte(notes), salt)
-	if err != nil {
-		return fmt.Errorf("failed to encrypt notes: %w", err)
+		return err
 	}
 
 	tx, err := db.Begin()
@@ -602,7 +566,7 @@ func createPasswordEntry(userID int, site, username, password, notes string, tag
 	}
 	defer tx.Rollback()
 
-	res, err := tx.Exec("INSERT INTO password_entries (user_id, site, username, password_encrypted, notes_encrypted, salt, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", userID, site, username, encryptedPassword, encryptedNotes, salt)
+	res, err := tx.Exec("INSERT INTO password_entries (user_id, site, username, password_encrypted, notes_encrypted, salt, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", userID, site, username, encryptedData.EncryptedPassword, encryptedData.EncryptedNotes, encryptedData.Salt)
 	if err != nil {
 		return fmt.Errorf("failed to insert password entry: %w", err)
 	}
@@ -613,34 +577,8 @@ func createPasswordEntry(userID int, site, username, password, notes string, tag
 	}
 
 	// Add tags to the new password entry
-	for _, tagName := range tagNames {
-		if tagName == "" {
-			continue // Skip empty tag names
-		}
-
-		var tagID int64
-		err := tx.QueryRow("SELECT id FROM tags WHERE user_id = ? AND name = ? COLLATE NOCASE", userID, tagName).Scan(&tagID)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				// Create the tag if it doesn't exist with default color
-				res, err := tx.Exec("INSERT INTO tags (user_id, name, description, color) VALUES (?, ?, '', ?)", userID, tagName, defaultTagColor)
-				if err != nil {
-					return fmt.Errorf("failed to create tag: %w", err)
-				}
-				tagID, err = res.LastInsertId()
-				if err != nil {
-					return fmt.Errorf("failed to get new tag id: %w", err)
-				}
-			} else {
-				return fmt.Errorf("failed to query tag: %w", err)
-			}
-		}
-
-		// Link the password and tag
-		_, err = tx.Exec("INSERT INTO entry_tags (entry_id, tag_id) VALUES (?, ?)", lastID, tagID)
-		if err != nil {
-			return fmt.Errorf("failed to link password and tag: %w", err)
-		}
+	if err := LinkPasswordToTags(tx, userID, lastID, tagNames); err != nil {
+		return err
 	}
 
 	return tx.Commit()
@@ -666,21 +604,10 @@ func createOrUpdatePasswordEntry(userID int, site, username, password, notes str
 
 // createPasswordEntryWithTags creates a password entry and handles tag creation
 func createPasswordEntryWithTags(userID int, site, username, password, notes string, tagNames []string) error {
-	// Generate a unique salt for this entry
-	salt := make([]byte, 16)
-	if _, err := rand.Read(salt); err != nil {
-		return fmt.Errorf("failed to generate salt: %w", err)
-	}
-
-	// First, encrypt the sensitive data using the new salt
-	encryptedPassword, err := encrypt([]byte(password), salt)
+	// Encrypt the sensitive data with a new salt
+	encryptedData, err := EncryptPasswordData(password, notes)
 	if err != nil {
-		return fmt.Errorf("failed to encrypt password: %w", err)
-	}
-
-	encryptedNotes, err := encrypt([]byte(notes), salt)
-	if err != nil {
-		return fmt.Errorf("failed to encrypt notes: %w", err)
+		return err
 	}
 
 	tx, err := db.Begin()
@@ -689,7 +616,7 @@ func createPasswordEntryWithTags(userID int, site, username, password, notes str
 	}
 	defer tx.Rollback()
 
-	res, err := tx.Exec("INSERT INTO password_entries (user_id, site, username, password_encrypted, notes_encrypted, salt, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", userID, site, username, encryptedPassword, encryptedNotes, salt)
+	res, err := tx.Exec("INSERT INTO password_entries (user_id, site, username, password_encrypted, notes_encrypted, salt, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", userID, site, username, encryptedData.EncryptedPassword, encryptedData.EncryptedNotes, encryptedData.Salt)
 	if err != nil {
 		return fmt.Errorf("failed to insert password entry: %w", err)
 	}
@@ -700,34 +627,8 @@ func createPasswordEntryWithTags(userID int, site, username, password, notes str
 	}
 
 	// Add tags to the new password entry
-	for _, tagName := range tagNames {
-		if tagName == "" {
-			continue // Skip empty tag names
-		}
-
-		var tagID int64
-		err := tx.QueryRow("SELECT id FROM tags WHERE user_id = ? AND name = ? COLLATE NOCASE", userID, tagName).Scan(&tagID)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				// Create the tag if it doesn't exist with default color
-				res, err := tx.Exec("INSERT INTO tags (user_id, name, description, color) VALUES (?, ?, '', ?)", userID, tagName, defaultTagColor)
-				if err != nil {
-					return fmt.Errorf("failed to create tag: %w", err)
-				}
-				tagID, err = res.LastInsertId()
-				if err != nil {
-					return fmt.Errorf("failed to get new tag id: %w", err)
-				}
-			} else {
-				return fmt.Errorf("failed to query tag: %w", err)
-			}
-		}
-
-		// Link the password and tag
-		_, err = tx.Exec("INSERT INTO entry_tags (entry_id, tag_id) VALUES (?, ?)", lastID, tagID)
-		if err != nil {
-			return fmt.Errorf("failed to link password and tag: %w", err)
-		}
+	if err := LinkPasswordToTags(tx, userID, lastID, tagNames); err != nil {
+		return err
 	}
 
 	return tx.Commit()
@@ -780,30 +681,8 @@ func updatePasswordEntry(userID, id int, site, username, password, notes string,
 	}
 
 	// Add new tags
-	for _, tagName := range tagNames {
-		var tagID int64
-		err := tx.QueryRow("SELECT id FROM tags WHERE user_id = ? AND name = ? COLLATE NOCASE", userID, tagName).Scan(&tagID)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				// Create the tag if it doesn't exist with default color
-				res, err := tx.Exec("INSERT INTO tags (user_id, name, description, color) VALUES (?, ?, '', ?)", userID, tagName, defaultTagColor)
-				if err != nil {
-					return fmt.Errorf("failed to create tag: %w", err)
-				}
-				tagID, err = res.LastInsertId()
-				if err != nil {
-					return fmt.Errorf("failed to get new tag id: %w", err)
-				}
-			} else {
-				return fmt.Errorf("failed to query tag: %w", err)
-			}
-		}
-
-		// Link the password and tag
-		_, err = tx.Exec("INSERT INTO entry_tags (entry_id, tag_id) VALUES (?, ?)", id, tagID)
-		if err != nil {
-			return fmt.Errorf("failed to link password and tag: %w", err)
-		}
+	if err := LinkPasswordToTags(tx, userID, int64(id), tagNames); err != nil {
+		return err
 	}
 
 	return tx.Commit()

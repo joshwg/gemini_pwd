@@ -110,7 +110,9 @@ Binary was compiled with 'CGO_ENABLED=0', go-sqlite3 requires cgo to work
 
 ## Environment Variables
 
-- `PWD_SECRET_KEY`: 32-byte encryption key (defaults to a hardcoded key - **change in production!**)
+- `PWD_SECRET_KEY`: **REQUIRED** - Must be exactly 32 bytes. Used for AES-256-GCM encryption of all passwords. Application will refuse to start without it.
+
+  **⚠️ CRITICAL: Store this key securely! If you lose it, all encrypted passwords become permanently unrecoverable.**
 
 ## Development
 

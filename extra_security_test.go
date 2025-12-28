@@ -12,6 +12,9 @@ import (
 )
 
 func TestExtraInputValidation(t *testing.T) {
+	// Initialize database for tests
+	initDB("test_passwords.db")
+
 	mux := setupTestServer()
 	user := createTestUser(t, "validuser", "StrongPassword123!", false)
 	session := createTestSession(t, user.ID)
@@ -44,6 +47,9 @@ func TestExtraInputValidation(t *testing.T) {
 }
 
 func TestExtraSQLInjection(t *testing.T) {
+	// Initialize database for tests
+	initDB("test_passwords.db")
+
 	mux := setupTestServer()
 	user := createTestUser(t, "sqlitest", "StrongPassword123!", false)
 	session := createTestSession(t, user.ID)
@@ -69,6 +75,9 @@ func TestExtraSQLInjection(t *testing.T) {
 }
 
 func TestExtraSessionInvalidation(t *testing.T) {
+	// Initialize database for tests
+	initDB("test_passwords.db")
+
 	mux := setupTestServer()
 	user := createTestUser(t, "sessiontest2", "StrongPassword123!", false)
 	session := createTestSession(t, user.ID)
