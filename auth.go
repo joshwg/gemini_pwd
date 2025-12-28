@@ -72,8 +72,8 @@ func recordLoginAttempt(username, ipAddress string, successful bool) error {
 	return err
 }
 
-// checkRateLimit checks if a user or IP is rate limited
-func checkRateLimit(username, ipAddress string) (bool, time.Duration, error) {
+// checkRateLimitByUsername checks if a username is rate limited
+func checkRateLimitByUsername(username string) (bool, time.Duration, error) {
 	now := time.Now()
 
 	// Check failed attempts for this username in the last 5 minutes

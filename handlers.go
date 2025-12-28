@@ -49,7 +49,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		clientIP := getClientIP(r)
 
 		// Check rate limiting before attempting authentication
-		isLimited, cooldownTime, err := checkRateLimit(username, clientIP)
+		isLimited, cooldownTime, err := checkRateLimitByUsername(username)
 		if err != nil {
 			logger.Error("Error checking rate limit", err)
 			httputil.InternalServerError(w, "", err)
@@ -117,14 +117,13 @@ func rateLimitCheckHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	username := r.FormValue("username")
-	clientIP := getClientIP(r)
 
 	if username == "" {
 		api.WriteRateLimitResponse(w, false, 0)
 		return
 	}
 
-	isLimited, cooldownTime, err := checkRateLimit(username, clientIP)
+	isLimited, cooldownTime, err := checkRateLimitByUsername(username)
 	if err != nil {
 		logger.Error("Error checking rate limit for API", err)
 		httputil.InternalServerError(w, "", err)
@@ -248,7 +247,7 @@ func usersAPIHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if data.NewUsername != "" {
-			if err := renameUser(currentUser, targetUserID, data.Username, data.NewUsername); err != nil {
+			if err := renameUser(currentUser, targetUserID, data.NewUsername); err != nil {
 				httputil.InternalServerError(w, err.Error(), err)
 				logger.Error("Error renaming user", err)
 				return

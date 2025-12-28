@@ -19,11 +19,8 @@ func startCleanupRoutines() {
 	go func() {
 		ticker := time.NewTicker(10 * time.Minute)
 		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				cleanupExpiredSessions()
-			}
+		for range ticker.C {
+			cleanupExpiredSessions()
 		}
 	}()
 
@@ -31,11 +28,8 @@ func startCleanupRoutines() {
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				cleanupOldLoginAttempts()
-			}
+		for range ticker.C {
+			cleanupOldLoginAttempts()
 		}
 	}()
 }

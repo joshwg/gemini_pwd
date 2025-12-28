@@ -96,7 +96,7 @@ func newRequestWithSession(method, url, body, sessionToken string) *http.Request
 
 // testUnauthenticatedAccess verifies that unauthenticated users cannot access protected resources
 func testUnauthenticatedAccess(t *testing.T) {
-	ensureTestDB(t)
+	ensureTestDB()
 	mux := setupTestServer()
 
 	protectedEndpoints := []struct {
@@ -170,7 +170,7 @@ func testUnauthenticatedAccess(t *testing.T) {
 
 // testCrossUserDataAccess verifies that users cannot access other users' data
 func testCrossUserDataAccess(t *testing.T) {
-	ensureTestDB(t)
+	ensureTestDB()
 	mux := setupTestServer()
 
 	// Create two test users with unique names
@@ -335,7 +335,7 @@ func testCrossUserDataAccess(t *testing.T) {
 
 // testSessionSecurity verifies session management security
 func testSessionSecurity(t *testing.T) {
-	ensureTestDB(t)
+	ensureTestDB()
 	mux := setupTestServer()
 
 	user := createTestUser(t, "sessiontest", "password123", false)
@@ -419,7 +419,7 @@ func testSessionSecurity(t *testing.T) {
 
 // testAPIEndpointSecurity tests specific API endpoint security
 func testAPIEndpointSecurity(t *testing.T) {
-	ensureTestDB(t)
+	ensureTestDB()
 	mux := setupTestServer()
 
 	user := createTestUser(t, "apitest", "password123", false)
@@ -518,7 +518,7 @@ func testAPIEndpointSecurity(t *testing.T) {
 
 // testSQLInjectionAttempts tests for SQL injection vulnerabilities
 func testSQLInjectionAttempts(t *testing.T) {
-	ensureTestDB(t)
+	ensureTestDB()
 	mux := setupTestServer()
 
 	user := createTestUser(t, "sqltest", "password123", false)

@@ -322,7 +322,6 @@ func TestLoggerFormatMessage(t *testing.T) {
 		name     string
 		prefix   string
 		emoji    string
-		level    string
 		message  string
 		expected string
 	}{
@@ -330,7 +329,6 @@ func TestLoggerFormatMessage(t *testing.T) {
 			name:     "Format without prefix",
 			prefix:   "",
 			emoji:    "✅",
-			level:    "SUCCESS",
 			message:  "Test message",
 			expected: "✅ Test message",
 		},
@@ -338,7 +336,6 @@ func TestLoggerFormatMessage(t *testing.T) {
 			name:     "Format with prefix",
 			prefix:   "TEST",
 			emoji:    "❌",
-			level:    "ERROR",
 			message:  "Error message",
 			expected: "❌ [TEST] Error message",
 		},
@@ -347,7 +344,7 @@ func TestLoggerFormatMessage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := NewLogger(tt.prefix)
-			result := logger.formatMessage(tt.emoji, tt.level, tt.message)
+			result := logger.formatMessage(tt.emoji, tt.message)
 
 			if result != tt.expected {
 				t.Errorf("formatMessage() = %q, expected %q", result, tt.expected)

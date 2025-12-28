@@ -94,7 +94,7 @@ func deleteUser(admin *User, usernameToDelete string) error {
 }
 
 // renameUser (Admin only)
-func renameUser(admin *User, userID int, oldUsername, newUsername string) error {
+func renameUser(admin *User, userID int, newUsername string) error {
 	if admin == nil || !admin.IsAdmin {
 		return fmt.Errorf("permission denied: only administrators can rename users")
 	}
@@ -453,38 +453,6 @@ func getPasswordsWithFilter(userID int, filter PasswordFilter) ([]PasswordEntry,
 	}
 
 	return passwords, nil
-}
-
-// getPasswordByIDDecrypted retrieves and decrypts a single password by ID
-func getPasswordByIDDecrypted(id int, globalKey []byte) (*PasswordEntry, error) {
-	var p PasswordEntry
-	var passwordEncrypted, notesEncrypted, salt []byte
-
-	query := `SELECT id, site, username, password_encrypted, notes_encrypted, salt, created_at, tags FROM passwords WHERE id = ?`
-	err := db.QueryRow(query, id).Scan(&p.ID, &p.Site, &p.Username, &passwordEncrypted, &notesEncrypted, &salt, &p.CreatedAt, &p.Tags)
-	if err != nil {
-		return nil, err
-	}
-
-	// Decrypt password
-	if len(passwordEncrypted) > 0 {
-		decryptedPassword, err := decrypt(passwordEncrypted, salt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decrypt password: %w", err)
-		}
-		p.Password = string(decryptedPassword)
-	}
-
-	// Decrypt notes
-	if len(notesEncrypted) > 0 {
-		decryptedNotes, err := decrypt(notesEncrypted, salt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decrypt notes: %w", err)
-		}
-		p.Notes = string(decryptedNotes)
-	}
-
-	return &p, nil
 }
 
 // getDecryptedPassword retrieves and decrypts only the password field for a specific user and password ID

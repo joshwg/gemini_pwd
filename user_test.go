@@ -10,7 +10,7 @@ import (
 // TestCreateUser tests the createUser function.
 func TestCreateUser(t *testing.T) {
 	// Setup: Ensure the database schema exists and is clean
-	ensureTestDB(t)
+	ensureTestDB()
 
 	// Create a dummy admin user for context
 	admin := &User{ID: 1, Username: "admin", IsAdmin: true}
@@ -48,7 +48,7 @@ func TestCreateUser(t *testing.T) {
 // TestCreateTag tests the createTag function.
 func TestCreateTag(t *testing.T) {
 	// Setup: Ensure the database schema exists and is clean
-	ensureTestDB(t)
+	ensureTestDB()
 	db.Exec("DELETE FROM tags")
 
 	// We need a user to associate the tag with
@@ -80,7 +80,7 @@ func TestCreateTag(t *testing.T) {
 // TestCreatePasswordEntry tests the createPasswordEntry function.
 func TestCreatePasswordEntry(t *testing.T) {
 	// Setup: Ensure the database schema exists and is clean
-	ensureTestDB(t)
+	ensureTestDB()
 	db.Exec("DELETE FROM password_entries")
 	db.Exec("DELETE FROM entry_tags")
 	db.Exec("DELETE FROM tags")

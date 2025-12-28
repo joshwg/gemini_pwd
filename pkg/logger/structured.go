@@ -19,7 +19,7 @@ func NewLogger(prefix string) *Logger {
 }
 
 // formatMessage formats a message with prefix if available
-func (l *Logger) formatMessage(emoji, level, msg string) string {
+func (l *Logger) formatMessage(emoji, msg string) string {
 	prefix := ""
 	if l.prefix != "" {
 		prefix = "[" + l.prefix + "] "
@@ -30,7 +30,7 @@ func (l *Logger) formatMessage(emoji, level, msg string) string {
 
 // Info logs an informational message
 func (l *Logger) Info(msg string, args ...interface{}) {
-	formatted := l.formatMessage("ℹ️", "INFO", msg)
+	formatted := l.formatMessage("ℹ️", msg)
 	if len(args) > 0 {
 		log.Printf(formatted, args...)
 	} else {
@@ -40,7 +40,7 @@ func (l *Logger) Info(msg string, args ...interface{}) {
 
 // Success logs a success message
 func (l *Logger) Success(msg string, args ...interface{}) {
-	formatted := l.formatMessage("✅", "SUCCESS", msg)
+	formatted := l.formatMessage("✅", msg)
 	if len(args) > 0 {
 		log.Printf(formatted, args...)
 	} else {
@@ -50,7 +50,7 @@ func (l *Logger) Success(msg string, args ...interface{}) {
 
 // Warning logs a warning message
 func (l *Logger) Warning(msg string, args ...interface{}) {
-	formatted := l.formatMessage("⚠️", "WARNING", msg)
+	formatted := l.formatMessage("⚠️", msg)
 	if len(args) > 0 {
 		log.Printf(formatted, args...)
 	} else {
@@ -63,10 +63,10 @@ func (l *Logger) Error(msg string, err error, args ...interface{}) {
 	if err != nil {
 		fullMsg := msg + " - %v"
 		allArgs := append(args, err)
-		formatted := l.formatMessage("❌", "ERROR", fullMsg)
+		formatted := l.formatMessage("❌", fullMsg)
 		log.Printf(formatted, allArgs...)
 	} else {
-		formatted := l.formatMessage("❌", "ERROR", msg)
+		formatted := l.formatMessage("❌", msg)
 		if len(args) > 0 {
 			log.Printf(formatted, args...)
 		} else {
@@ -101,10 +101,10 @@ func (l *Logger) Fatal(msg string, err error, args ...interface{}) {
 	if err != nil {
 		fullMsg := msg + " - %v"
 		allArgs := append(args, err)
-		formatted := l.formatMessage("💀", "FATAL", fullMsg)
+		formatted := l.formatMessage("💀", fullMsg)
 		log.Fatalf(formatted, allArgs...)
 	} else {
-		formatted := l.formatMessage("💀", "FATAL", msg)
+		formatted := l.formatMessage("💀", msg)
 		if len(args) > 0 {
 			log.Fatalf(formatted, args...)
 		} else {

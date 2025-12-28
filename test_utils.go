@@ -3,10 +3,6 @@
 // test_utils.go
 package main
 
-import (
-	"testing"
-)
-
 // createSchema creates the database schema for tests using SQLite syntax
 func createSchema() error {
 	// SQLite-compatible schema for testing
@@ -85,7 +81,7 @@ func createSchema() error {
 }
 
 // ensureTestDB makes sure the database schema exists and is clean for all tests
-func ensureTestDB(t *testing.T) {
+func ensureTestDB() {
 	// Initialize the global db connection to the test database using the real application's schema
 	// This ensures we have exactly the same schema as production
 	initDB("test_passwords.db")
@@ -95,14 +91,4 @@ func ensureTestDB(t *testing.T) {
 	for _, table := range cleanTables {
 		db.Exec("DELETE FROM " + table)
 	}
-}
-
-// setupTestDB deprecated - use ensureTestDB instead
-func setupTestDB() *testing.T {
-	return nil
-}
-
-// cleanTestDB deprecated - cleaning is now handled by ensureTestDB
-func cleanTestDB() {
-	// This function is now handled by ensureTestDB
 }
