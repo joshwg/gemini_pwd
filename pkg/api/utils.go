@@ -6,8 +6,8 @@ package api
 import (
 	"net/http"
 
-	"gemini_pwd/pkg/httputil"
-	"gemini_pwd/pkg/logger"
+	"gemini-pwd/pkg/httputil"
+	"gemini-pwd/pkg/logger"
 )
 
 // DecodeRequest decodes JSON request body into the provided data structure

@@ -5,7 +5,7 @@ package main
 
 import (
 	"database/sql"
-	templatePkg "gemini_pwd/pkg/template"
+	templatePkg "gemini-pwd/pkg/template"
 	"log"
 	"os"
 	"testing"

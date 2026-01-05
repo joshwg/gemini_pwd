@@ -4,8 +4,8 @@
 package main
 
 import (
-	"gemini_pwd/pkg/logger"
-	"gemini_pwd/pkg/template"
+	"gemini-pwd/pkg/logger"
+	"gemini-pwd/pkg/template"
 	"net/http"
 	"os"
 	"time"

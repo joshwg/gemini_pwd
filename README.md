@@ -30,41 +30,41 @@ A secure password manager built with Go that provides encrypted storage of passw
 build.bat
 
 # OR use WSL (recommended - always works)
-wsl CGO_ENABLED=1 go build -o gemini_pwd
+wsl CGO_ENABLED=1 go build -o gemini-pwd
 ```
 
 ### Manual Build Commands
 
 **Linux/WSL:**
 ```bash
-CGO_ENABLED=1 go build -o gemini_pwd
+CGO_ENABLED=1 go build -o gemini-pwd
 ```
 
 **Windows with C compiler:**
 ```powershell
-$env:CGO_ENABLED=1; go build -o gemini_pwd.exe
+$env:CGO_ENABLED=1; go build -o gemini-pwd.exe
 ```
 
 **Windows without C compiler (use WSL):**
 ```powershell
-wsl CGO_ENABLED=1 go build -o gemini_pwd
+wsl CGO_ENABLED=1 go build -o gemini-pwd
 ```
 
 ### Running
 
 **Linux/WSL:**
 ```bash
-./gemini_pwd
+./gemini-pwd
 ```
 
 **Windows (if native build succeeded):**
 ```cmd
-gemini_pwd.exe
+gemini-pwd.exe
 ```
 
 **Windows via WSL (recommended):**
 ```powershell
-wsl ./gemini_pwd
+wsl ./gemini-pwd
 ```
 
 ## Why CGO is Required
@@ -90,8 +90,8 @@ Binary was compiled with 'CGO_ENABLED=0', go-sqlite3 requires cgo to work
 
 3. Run the application:
    ```bash
-   ./gemini_pwd      # Linux/WSL
-   gemini_pwd.exe    # Windows
+   ./gemini-pwd      # Linux/WSL
+   gemini-pwd.exe    # Windows
    ```
 
 4. Open your browser to `http://localhost:8080`

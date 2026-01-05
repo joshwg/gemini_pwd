@@ -5,7 +5,7 @@ package httputil
 
 import (
 	"encoding/json"
-	"gemini_pwd/pkg/logger"
+	"gemini-pwd/pkg/logger"
 	"net/http"
 )
 

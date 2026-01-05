@@ -7,7 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"gemini_pwd/pkg/logger"
+	"gemini-pwd/pkg/logger"
 
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"

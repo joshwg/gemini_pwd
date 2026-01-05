@@ -1,7 +1,7 @@
 #!/bin/bash
 # Copyright (C) 2025 Joshua Goldstein
 
-# Build script for gemini_pwd deployment
+# Build script for gemini-pwd deployment
 # This script builds the application for Linux deployment
 
 set -e
@@ -19,7 +19,7 @@ mkdir -p deploy/package
 
 # Build for Linux (assuming deployment on Ubuntu/Debian)
 echo "Building for Linux amd64..."
-GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o deploy/package/gemini_pwd .
+GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o deploy/package/gemini-pwd .
 
 # Copy required files
 echo "Copying application files..."
@@ -33,13 +33,13 @@ cp README.md deploy/package/
 # Create a deployment package
 echo "Creating deployment package..."
 cd deploy
-tar -czf gemini_pwd-$(date +%Y%m%d-%H%M%S).tar.gz package/
+tar -czf gemini-pwd-$(date +%Y%m%d-%H%M%S).tar.gz package/
 
 echo "Build completed!"
 echo "Deployment package created in deploy/ directory"
 echo ""
 echo "To deploy:"
 echo "1. Copy the tar.gz file to your server"
-echo "2. Extract it: tar -xzf gemini_pwd-*.tar.gz"
-echo "3. Move contents to /tmp/gemini_pwd/"
+echo "2. Extract it: tar -xzf gemini-pwd-*.tar.gz"
+echo "3. Move contents to /tmp/gemini-pwd/"
 echo "4. Run the deployment script as root"

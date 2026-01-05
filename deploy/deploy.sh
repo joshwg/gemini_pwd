@@ -9,11 +9,11 @@ set -e
 echo "=== Gemini PWD Deployment Script ==="
 
 # Configuration
-APP_NAME="gemini_pwd"
+APP_NAME="gemini-pwd"
 APP_USER="geminipwd"
-APP_DIR="/opt/gemini_pwd"
-SERVICE_FILE="/etc/systemd/system/gemini_pwd.service"
-APACHE_SITE_FILE="/etc/apache2/sites-available/gemini_pwd.conf"
+APP_DIR="/opt/gemini-pwd"
+SERVICE_FILE="/etc/systemd/system/gemini-pwd.service"
+APPCHE_SITE_FILE="/etc/apache2/sites-available/gemini-pwd.conf"
 
 # Colors for output
 RED='\033[0;31m'

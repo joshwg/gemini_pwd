@@ -9,7 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
-	"gemini_pwd/pkg/logger"
+	"gemini-pwd/pkg/logger"
 	"io"
 	"os"
 

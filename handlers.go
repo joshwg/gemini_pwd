@@ -6,10 +6,10 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
-	"gemini_pwd/pkg/api"
-	"gemini_pwd/pkg/httputil"
-	"gemini_pwd/pkg/logger"
-	templatePkg "gemini_pwd/pkg/template"
+	"gemini-pwd/pkg/api"
+	"gemini-pwd/pkg/httputil"
+	"gemini-pwd/pkg/logger"
+	templatePkg "gemini-pwd/pkg/template"
 	"net/http"
 	"strconv"
 	"strings"
@@ -462,14 +462,21 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Fetch the created password entry to return it (without sensitive data)
-		passwords, err := getPasswords(currentUser.ID, "")
+		// Use the site name as a query to find the specific password
+		filter := PasswordFilter{
+			Query:  data.Site,
+			TagIDs: []int{},
+			Limit:  100,
+			Offset: 0,
+		}
+		passwords, err := getPasswordsWithFilter(currentUser.ID, filter)
 		if err != nil {
 			logger.Error("Error retrieving passwords after creation", err)
 			httputil.InternalServerError(w, "Password created but failed to retrieve", err)
 			return
 		}
 
-		// Find the most recently created password for this user
+		// Find the created password entry by exact site and username match
 		var createdPassword *PasswordEntry
 		for _, p := range passwords {
 			if p.Site == data.Site && p.Username == data.Username {

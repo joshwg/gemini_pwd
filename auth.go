@@ -7,13 +7,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"gemini_pwd/pkg/httputil"
+	"gemini-pwd/pkg/httputil"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
-	"gemini_pwd/pkg/logger"
+	"gemini-pwd/pkg/logger"
 
 	"github.com/google/uuid"
 )

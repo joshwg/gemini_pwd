@@ -8,16 +8,16 @@
 -- CRUD on the existing tables in the existing database
 
 -- Create the database
-CREATE DATABASE gemini_pwd;
+CREATE DATABASE gemini-pwd;
 
 -- Select the new database to use it
-USE gemini_pwd;
+USE gemini-pwd;
 
 --- Create the database
-CREATE DATABASE IF NOT EXISTS gemini_pwd;
+CREATE DATABASE IF NOT EXISTS gemini-pwd;
 
 -- Select the new database to use it
-USE gemini_pwd;
+USE gemini-pwd;
 
 -- Create the users table
 CREATE TABLE IF NOT EXISTS users (

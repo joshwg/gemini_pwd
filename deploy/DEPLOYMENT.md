@@ -13,11 +13,11 @@ This guide will help you deploy the Gemini PWD application to a Linux server usi
 
 The deployment package includes:
 
-- `gemini_pwd` - The compiled Go binary
+- `gemini-pwd` - The compiled Go binary
 - `templates/` - HTML templates directory
 - `create_base_db.sql` - Database initialization script
-- `gemini_pwd.service` - Systemd service configuration
-- `apache-gemini_pwd.conf` - Apache virtual host configuration
+- `gemini-pwd.service` - Systemd service configuration
+- `apache-gemini-pwd.conf` - Apache virtual host configuration
 - `deploy.sh` - Automated deployment script
 
 ## Quick Deployment
@@ -40,7 +40,7 @@ Copy the generated tar.gz file to your server:
 
 ```bash
 # Example using scp
-scp deploy/gemini_pwd-*.tar.gz user@your-server:/tmp/
+scp deploy/gemini-pwd-*.tar.gz user@your-server:/tmp/
 ```
 
 ### Step 3: Deploy on Server
@@ -50,8 +50,8 @@ On your Linux server:
 ```bash
 # Extract the deployment package
 cd /tmp
-tar -xzf gemini_pwd-*.tar.gz
-mv package gemini_pwd
+tar -xzf gemini-pwd-*.tar.gz
+mv package gemini-pwd
 
 # Run the deployment script
 cd /path/to/deploy/files
@@ -79,44 +79,44 @@ sudo a2enmod ssl proxy proxy_http headers deflate rewrite
 ### 3. Create Application User
 
 ```bash
-sudo useradd --system --shell /bin/false --home-dir /opt/gemini_pwd --create-home geminipwd
+sudo useradd --system --shell /bin/false --home-dir /opt/gemini-pwd --create-home geminipwd
 ```
 
 ### 4. Install Application
 
 ```bash
 # Create directory and copy files
-sudo mkdir -p /opt/gemini_pwd
-sudo cp gemini_pwd /opt/gemini_pwd/
-sudo cp -r templates /opt/gemini_pwd/
-sudo cp create_base_db.sql /opt/gemini_pwd/
+sudo mkdir -p /opt/gemini-pwd
+sudo cp gemini-pwd /opt/gemini-pwd/
+sudo cp -r templates /opt/gemini-pwd/
+sudo cp create_base_db.sql /opt/gemini-pwd/
 
 # Set permissions
-sudo chown -R geminipwd:geminipwd /opt/gemini_pwd
-sudo chmod +x /opt/gemini_pwd/gemini_pwd
+sudo chown -R geminipwd:geminipwd /opt/gemini-pwd
+sudo chmod +x /opt/gemini-pwd/gemini-pwd
 ```
 
 ### 5. Install Systemd Service
 
 ```bash
-sudo cp gemini_pwd.service /etc/systemd/system/
+sudo cp gemini-pwd.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable gemini_pwd
-sudo systemctl start gemini_pwd
+sudo systemctl enable gemini-pwd
+sudo systemctl start gemini-pwd
 ```
 
 ### 6. Configure Apache
 
 ```bash
 # Copy Apache configuration
-sudo cp apache-gemini_pwd.conf /etc/apache2/sites-available/gemini_pwd.conf
+sudo cp apache-gemini-pwd.conf /etc/apache2/sites-available/gemini-pwd.conf
 
 # Edit the configuration to update your domain name
-sudo nano /etc/apache2/sites-available/gemini_pwd.conf
+sudo nano /etc/apache2/sites-available/gemini-pwd.conf
 
 # Enable the site
 sudo a2dissite 000-default
-sudo a2ensite gemini_pwd
+sudo a2ensite gemini-pwd
 sudo systemctl reload apache2
 ```
 
@@ -145,7 +145,7 @@ sudo certbot renew --dry-run
 
 ### Using Custom Certificates
 
-Edit `/etc/apache2/sites-available/gemini_pwd.conf` and update the SSL certificate paths:
+Edit `/etc/apache2/sites-available/gemini-pwd.conf` and update the SSL certificate paths:
 
 ```apache
 SSLCertificateFile /path/to/your/certificate.crt
@@ -181,23 +181,23 @@ The deployment includes:
 
 ```bash
 # Start the service
-sudo systemctl start gemini_pwd
+sudo systemctl start gemini-pwd
 
 # Stop the service
-sudo systemctl stop gemini_pwd
+sudo systemctl stop gemini-pwd
 
 # Restart the service
-sudo systemctl restart gemini_pwd
+sudo systemctl restart gemini-pwd
 
 # Check status
-sudo systemctl status gemini_pwd
+sudo systemctl status gemini-pwd
 
 # View logs
-sudo journalctl -u gemini_pwd -f
+sudo journalctl -u gemini-pwd -f
 
 # View Apache logs
-sudo tail -f /var/log/apache2/gemini_pwd_error.log
-sudo tail -f /var/log/apache2/gemini_pwd_access.log
+sudo tail -f /var/log/apache2/gemini-pwd_error.log
+sudo tail -f /var/log/apache2/gemini-pwd_access.log
 ```
 
 ## Backup Strategy
@@ -206,19 +206,19 @@ sudo tail -f /var/log/apache2/gemini_pwd_access.log
 
 ```bash
 # Create backup script
-sudo nano /opt/gemini_pwd/backup.sh
+sudo nano /opt/gemini-pwd/backup.sh
 
 #!/bin/bash
 DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR="/opt/gemini_pwd/backups"
+BACKUP_DIR="/opt/gemini-pwd/backups"
 mkdir -p "$BACKUP_DIR"
 cp /opt/passwords.db "$BACKUP_DIR/passwords_$DATE.db"
 find "$BACKUP_DIR" -name "passwords_*.db" -mtime +30 -delete
 
 # Make executable and add to cron
-sudo chmod +x /opt/gemini_pwd/backup.sh
+sudo chmod +x /opt/gemini-pwd/backup.sh
 sudo crontab -e
-# Add: 0 2 * * * /opt/gemini_pwd/backup.sh
+# Add: 0 2 * * * /opt/gemini-pwd/backup.sh
 ```
 
 ## Troubleshooting
@@ -227,8 +227,8 @@ sudo crontab -e
 
 ```bash
 # Check service status and logs
-sudo systemctl status gemini_pwd
-sudo journalctl -u gemini_pwd -n 50
+sudo systemctl status gemini-pwd
+sudo journalctl -u gemini-pwd -n 50
 
 # Common issues:
 # - Port already in use
@@ -265,10 +265,10 @@ sudo chown geminipwd:geminipwd /opt/passwords.db
 
 ```bash
 # Real-time application logs
-sudo journalctl -u gemini_pwd -f
+sudo journalctl -u gemini-pwd -f
 
 # Real-time Apache logs
-sudo tail -f /var/log/apache2/gemini_pwd_access.log
+sudo tail -f /var/log/apache2/gemini-pwd_access.log
 ```
 
 ### Performance Monitoring
@@ -293,9 +293,10 @@ Consider installing monitoring tools like:
 ## Updating the Application
 
 1. Build new version using `build-for-deployment.sh`
-2. Stop the service: `sudo systemctl stop gemini_pwd`
+2. Stop the service: `sudo systemctl stop gemini-pwd`
 3. Backup the database: `cp /opt/passwords.db /tmp/`
-4. Replace the binary: `sudo cp gemini_pwd /opt/gemini_pwd/`
-5. Update templates if needed: `sudo cp -r templates /opt/gemini_pwd/`
-6. Set permissions: `sudo chown geminipwd:geminipwd /opt/gemini_pwd/gemini_pwd`
-7. Start the service: `sudo systemctl start gemini_pwd`
+4. Replace the binary: `sudo cp gemini-pwd /opt/gemini-pwd/`
+5. Update templates if needed: `sudo cp -r templates /opt/gemini-pwd/`
+6. Set permissions: `sudo chown geminipwd:geminipwd /opt/gemini-pwd/gemini-pwd`
+7. Start the service: `sudo systemctl start gemini-pwd`
+

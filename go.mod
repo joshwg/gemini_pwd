@@ -1,5 +1,5 @@
 // go.mod
-module gemini_pwd
+module gemini-pwd
 
 
 go 1.21.0
