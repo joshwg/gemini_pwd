@@ -115,3 +115,89 @@ func TestCreatePasswordEntry(t *testing.T) {
 		t.Errorf("Failed to find the link between the entry and the tag: %v", err)
 	}
 }
+
+// TestCreatePasswordEntryWithNoNote tests creating a password entry without a note.
+func TestCreatePasswordEntryWithNoNote(t *testing.T) {
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB()
+	db.Exec("DELETE FROM password_entries")
+	db.Exec("DELETE FROM entry_tags")
+	db.Exec("DELETE FROM tags")
+	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'testuser', 'hash', 0)")
+
+	// Test case: Successful password entry creation without a note (empty string)
+	tags := []string{"Work"}
+	err := createPasswordEntry(1, "work.com", "admin@work.com", "workpass123", "", tags)
+	if err != nil {
+		t.Errorf("Expected no error when creating a password entry without a note, but got: %v", err)
+	}
+
+	// Verify the password entry was created and notes decrypt to empty string
+	var site string
+	var entryID int
+	err = db.QueryRow("SELECT id, site FROM password_entries WHERE site = 'work.com' AND user_id = 1").Scan(&entryID, &site)
+	if err != nil {
+		t.Errorf("Failed to find the newly created password entry in the database: %v", err)
+	}
+	if site != "work.com" {
+		t.Errorf("Expected site 'work.com', but got '%s'", site)
+	}
+
+	// Verify notes decrypt to empty string
+	decryptedNotes, err := getDecryptedNotes(1, entryID)
+	if err != nil {
+		t.Errorf("Failed to decrypt notes: %v", err)
+	}
+	if decryptedNotes != "" {
+		t.Errorf("Expected empty notes after decryption, but got '%s'", decryptedNotes)
+	}
+}
+
+// TestUpdatePasswordEntryWithNoNote tests updating a password entry to have no note.
+func TestUpdatePasswordEntryWithNoNote(t *testing.T) {
+	// Setup: Ensure the database schema exists and is clean
+	ensureTestDB()
+	db.Exec("DELETE FROM password_entries")
+	db.Exec("DELETE FROM entry_tags")
+	db.Exec("DELETE FROM tags")
+	db.Exec("INSERT INTO users (id, username, password_hash, is_admin) VALUES (1, 'testuser', 'hash', 0)")
+
+	// First, create a password entry with a note
+	tags := []string{"Personal"}
+	err := createPasswordEntry(1, "test.com", "user@test.com", "testpass", "Initial notes", tags)
+	if err != nil {
+		t.Fatalf("Failed to create initial password entry: %v", err)
+	}
+
+	// Get the entry ID
+	var entryID int
+	err = db.QueryRow("SELECT id FROM password_entries WHERE site = 'test.com' AND user_id = 1").Scan(&entryID)
+	if err != nil {
+		t.Fatalf("Failed to find the created password entry: %v", err)
+	}
+
+	// Test: Update the password entry with no note (empty string)
+	err = updatePasswordEntry(1, entryID, "test.com", "user@test.com", "testpass", "", tags)
+	if err != nil {
+		t.Errorf("Expected no error when updating password entry with no note, but got: %v", err)
+	}
+
+	// Verify the password entry was updated and notes decrypt to empty string
+	var site string
+	err = db.QueryRow("SELECT site FROM password_entries WHERE id = ?", entryID).Scan(&site)
+	if err != nil {
+		t.Errorf("Failed to find the updated password entry in the database: %v", err)
+	}
+	if site != "test.com" {
+		t.Errorf("Expected site 'test.com', but got '%s'", site)
+	}
+
+	// Verify notes decrypt to empty string
+	decryptedNotes, err := getDecryptedNotes(1, entryID)
+	if err != nil {
+		t.Errorf("Failed to decrypt notes: %v", err)
+	}
+	if decryptedNotes != "" {
+		t.Errorf("Expected empty notes after decryption, but got '%s'", decryptedNotes)
+	}
+}

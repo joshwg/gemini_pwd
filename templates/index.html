@@ -25,7 +25,12 @@
             <div class="flex items-center justify-between mb-4 flex-wrap gap-4">
                 <h2 class="text-2xl font-semibold">Your Passwords</h2>
                 <div class="flex items-center flex-wrap gap-2">
-                    <input type="text" id="searchPassword" placeholder="Site or username..." class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-full sm:w-auto">
+                    <div class="relative">
+                        <input type="text" id="searchPassword" placeholder="Site or username..." class="shadow appearance-none border rounded py-2 px-3 pr-8 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-full sm:w-auto">
+                        <button id="clearSearchBtn" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none hidden" title="Clear search">
+                            <i class="fas fa-times-circle"></i>
+                        </button>
+                    </div>
                     <button id="createPasswordBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline whitespace-nowrap" title="Create a new password entry">
                         <i class="fas fa-plus mr-2"></i>New Password
                     </button>
@@ -125,7 +130,7 @@
     }
     
     /* Responsive adjustments for narrow screens */
-    @media (max-width: 640px) {
+    @media (max-width: 768px) {
         /* Reduce font sizes on very small screens */
         .text-2xl {
             font-size: 1.25rem !important;
@@ -140,30 +145,44 @@
             width: 100% !important;
         }
         
-        /* Make cards more compact on mobile */
+        /* Make cards more compact on mobile - use flex column instead of grid */
         .grid-cols-12 {
-            display: block !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 0.75rem !important;
         }
         
         .grid-cols-12 > div {
-            margin-bottom: 1rem;
+            width: 100% !important;
+            max-width: 100% !important;
         }
         
-        .grid-cols-12 > div:last-child {
-            margin-bottom: 0;
-        }
-        
-        /* Stack password fields vertically on mobile */
+        /* Ensure password display area uses available width without overflow */
         .password-display {
             min-width: 0 !important;
-            width: 100% !important;
+            flex: 1 !important;
+            font-size: 0.875rem !important;
         }
         
-        /* Make action buttons full width on mobile */
-        .col-span-12.sm\\:col-span-2 {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
+        /* Ensure password buttons container doesn't overflow */
+        .password-display ~ .show-password-btn,
+        .password-display ~ .copy-password-btn {
+            flex-shrink: 0 !important;
+        }
+        
+        /* Make action buttons centered and properly spaced on mobile */
+        .col-span-12.sm\\:col-span-2,
+        .col-span-12.md\\:col-span-2 {
+            display: flex !important;
+            justify-content: center !important;
+            padding-top: 0.5rem !important;
+            border-top: 1px solid #f3f4f6 !important;
+        }
+        
+        .col-span-12.sm\\:col-span-2 > div,
+        .col-span-12.md\\:col-span-2 > div {
+            width: 100% !important;
+            max-width: 200px !important;
         }
         
         /* Reduce card padding on mobile */
@@ -201,6 +220,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         const passwordCardContainer = document.getElementById('passwordCardContainer');
         const searchPasswordInput = document.getElementById('searchPassword');
+        const clearSearchBtn = document.getElementById('clearSearchBtn');
         const createPasswordBtn = document.getElementById('createPasswordBtn');
         const passwordModal = document.getElementById('passwordModal');
         const passwordForm = document.getElementById('passwordForm');
@@ -234,8 +254,29 @@
 
         // Search functionality
         searchPasswordInput.addEventListener('keyup', () => {
+            updateClearSearchButton();
             applyFilters();
         });
+        
+        searchPasswordInput.addEventListener('input', () => {
+            updateClearSearchButton();
+        });
+        
+        // Clear search button functionality
+        clearSearchBtn.addEventListener('click', () => {
+            searchPasswordInput.value = '';
+            updateClearSearchButton();
+            applyFilters();
+        });
+        
+        // Function to show/hide clear search button
+        function updateClearSearchButton() {
+            if (searchPasswordInput.value.trim() !== '') {
+                clearSearchBtn.classList.remove('hidden');
+            } else {
+                clearSearchBtn.classList.add('hidden');
+            }
+        }
         
         // Tag filter functionality
         clearTagFilters.addEventListener('click', () => {
@@ -718,7 +759,7 @@
                 passwordSite.value = password.site;
                 passwordUsername.value = password.username;
                 passwordValue.value = ''; // Clear password field for security
-                passwordNotes.value = password.notes;
+                passwordNotes.value = password.notes || '';
                 
                 // Clear and populate tags
                 passwordTagsContainer.innerHTML = '';
@@ -884,12 +925,16 @@
                     return '<span class="tag-item text-xs font-semibold inline-block py-0.5 px-2 rounded border mr-1 mb-1" style="background-color: ' + tagColor + '; color: ' + textColor + '; border: ' + borderStyle + ';">' + tag.name + '</span>';
                 }).join('');
                 
-                // Password display area with show/hide and copy functionality
+                // Password display area with all buttons
                 const passwordHTML = 
-                    '<div class="flex items-center gap-2 relative">' +
-                        '<input type="password" id="password-' + p.id + '" class="password-display flex-1 py-1 px-2 text-sm border rounded bg-gray-50" placeholder="••••••••" readonly>' +
-                        '<button class="show-password-btn p-1 transform hover:text-blue-500 hover:scale-110" data-id="' + p.id + '" title="Show/Hide password"><i class="fas fa-eye"></i></button>' +
-                        '<button class="copy-password-btn p-1 transform hover:text-green-500 hover:scale-110" data-id="' + p.id + '" title="Copy password to clipboard"><i class="fas fa-copy"></i></button>' +
+                    '<div class="flex items-center gap-2 relative flex-wrap">' +
+                        '<input type="password" id="password-' + p.id + '" class="password-display flex-1 py-1 px-2 text-sm border rounded bg-gray-50 min-w-0" placeholder="••••••••" readonly>' +
+                        '<span class="flex items-center gap-1 flex-shrink-0">' +
+                            '<button class="show-password-btn p-1 transform hover:text-blue-500 hover:scale-110" data-id="' + p.id + '" title="Show/Hide password"><i class="fas fa-eye"></i></button>' +
+                            '<button class="copy-password-btn p-1 transform hover:text-green-500 hover:scale-110" data-id="' + p.id + '" title="Copy password to clipboard"><i class="fas fa-copy"></i></button>' +
+                            '<button class="edit-password-btn p-1 transform hover:text-blue-500 hover:scale-110" data-id="' + p.id + '" title="Edit password"><i class="fas fa-edit"></i></button>' +
+                            '<button class="delete-password-btn p-1 transform hover:text-red-500 hover:scale-110" data-id="' + p.id + '" title="Delete password"><i class="fas fa-trash-alt"></i></button>' +
+                        '</span>' +
                         '<div id="copy-message-' + p.id + '" class="absolute right-0 top-full mt-1 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg hidden z-10">' +
                             '<i class="fas fa-check mr-1"></i>Copied!' +
                         '</div>' +
@@ -898,29 +943,22 @@
                 // Card HTML structure
                 card.innerHTML = 
                     '<div class="p-4">' +
-                        '<!-- First Row: Site, Username, Password, Actions -->' +
-                        '<div class="grid grid-cols-12 gap-4 items-center mb-3">' +
-                            '<div class="col-span-12 sm:col-span-3">' +
+                        '<!-- First Row: Site, Username, Password -->' +
+                        '<div class="grid grid-cols-1 md:grid-cols-12 gap-4 mb-3">' +
+                            '<div class="md:col-span-3">' +
                                 '<label class="text-xs text-gray-500 uppercase tracking-wide">Site</label>' +
                                 '<div class="font-medium text-gray-900 break-all">' + p.site + '</div>' +
                             '</div>' +
-                            '<div class="col-span-12 sm:col-span-3">' +
+                            '<div class="md:col-span-3">' +
                                 '<label class="text-xs text-gray-500 uppercase tracking-wide">Username</label>' +
                                 '<div class="font-medium text-gray-700 break-all">' + p.username + '</div>' +
                             '</div>' +
-                            '<div class="col-span-12 sm:col-span-4">' +
+                            '<div class="md:col-span-6">' +
                                 '<label class="text-xs text-gray-500 uppercase tracking-wide">Password</label>' +
                                 '<div class="mt-1">' + passwordHTML + '</div>' +
                             '</div>' +
-                            '<div class="col-span-12 sm:col-span-2 text-center">' +
-                                '<label class="text-xs text-gray-500 uppercase tracking-wide">Actions</label>' +
-                                '<div class="flex justify-center gap-2 mt-1">' +
-                                    '<button class="edit-password-btn p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors" data-id="' + p.id + '" title="Edit password"><i class="fas fa-edit"></i></button>' +
-                                    '<button class="delete-password-btn p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded transition-colors" data-id="' + p.id + '" title="Delete password"><i class="fas fa-trash-alt"></i></button>' +
-                                '</div>' +
-                            '</div>' +
                         '</div>' +
-                        '<!-- Second Row: Tags and Notes -->' +
+                        '<!-- Tags and Notes Row -->' +
                         '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-3 border-t border-gray-100">' +
                             '<div class="tags-container">' +
                                 '<div class="flex items-center mb-2">' +
