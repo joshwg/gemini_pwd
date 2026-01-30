@@ -11,7 +11,7 @@ async function handleAuthResponse(response) {
     // Check for authentication errors
     if (response.status === 401 || response.status === 403) {
         alert('Your session has expired. You will be redirected to the login page.');
-        window.location.href = '/logout';
+        window.location.href = '/';
         return null;
     }
     
@@ -19,7 +19,7 @@ async function handleAuthResponse(response) {
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('text/html') && !response.ok) {
         alert('Your session has expired. You will be redirected to the login page.');
-        window.location.href = '/logout';
+        window.location.href = '/';
         return null;
     }
     

@@ -280,11 +280,19 @@
                 if (!response) return; // Auth error handled by authFetch
                 if (!response.ok) throw new Error('Failed to fetch tags.');
                 const tags = await response.json();
+                
+                // Validate tags is an array
+                if (!Array.isArray(tags)) {
+                    console.error('Invalid tags response:', tags);
+                    alert('Error: Invalid data received from server');
+                    return;
+                }
+                
                 allTags = tags; // Store tags for validation
                 renderTags(tags);
             } catch (e) {
-                console.error(e);
-                alert(e.message);
+                console.error('Error fetching tags:', e);
+                alert('Error loading tags: ' + e.message);
             }
         }
 
@@ -311,6 +319,12 @@
         function renderTags(tags) {
             tagTableBody.innerHTML = '';
             
+            // Validate input
+            if (!Array.isArray(tags)) {
+                console.error('renderTags called with non-array:', tags);
+                return;
+            }
+            
             // Handle empty state
             if (tags.length === 0) {
                 const emptyRow = document.createElement('tr');
@@ -326,28 +340,47 @@
                 return;
             }
             
-            tags.forEach(tag => {
-                const row = document.createElement('tr');
-                row.className = 'border-b border-gray-200 hover:bg-gray-100';
-                row.innerHTML = `
-                    <td class="py-3 px-6 text-left break-all">${tag.name}</td>
-                    <td class="py-3 px-6 text-left break-all">${tag.description}</td>
-                    <td class="py-3 px-6 text-left">
-                        <span class="inline-block w-6 h-6 rounded-full" style="background-color: ${getTagColor(tag.color)};"></span>
-                    </td>
-                    <td class="py-3 px-6 text-center">
-                        <div class="flex item-center justify-center">
-                            <button class="edit-tag-btn w-4 mr-2 transform hover:text-blue-500 hover:scale-110" data-id="${tag.id}">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="delete-tag-btn w-4 mr-2 transform hover:text-red-500 hover:scale-110" data-id="${tag.id}">
-                                <i class="fas fa-trash-alt"></i>
-                            </button>
-                        </div>
-                    </td>
-                `;
-                tagTableBody.appendChild(row);
-            });
+            // Render each tag with error handling
+            try {
+                tags.forEach(tag => {
+                    // Validate tag object
+                    if (!tag || typeof tag.id === 'undefined') {
+                        console.warn('Skipping invalid tag:', tag);
+                        return;
+                    }
+                    
+                    const row = document.createElement('tr');
+                    row.className = 'border-b border-gray-200 hover:bg-gray-100';
+                    row.innerHTML = `
+                        <td class="py-3 px-6 text-left break-all">${escapeHtml(tag.name || '')}</td>
+                        <td class="py-3 px-6 text-left break-all">${escapeHtml(tag.description || '')}</td>
+                        <td class="py-3 px-6 text-left">
+                            <span class="inline-block w-6 h-6 rounded-full" style="background-color: ${getTagColor(tag.color)};"></span>
+                        </td>
+                        <td class="py-3 px-6 text-center">
+                            <div class="flex item-center justify-center">
+                                <button class="edit-tag-btn w-4 mr-2 transform hover:text-blue-500 hover:scale-110" data-id="${tag.id}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="delete-tag-btn w-4 mr-2 transform hover:text-red-500 hover:scale-110" data-id="${tag.id}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    tagTableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Error rendering tags:', error);
+                alert('Error displaying tags. Please refresh the page.');
+            }
+        }
+        
+        // Helper function to escape HTML and prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
     });
 </script>
