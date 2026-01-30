@@ -88,13 +88,19 @@ Binary was compiled with 'CGO_ENABLED=0', go-sqlite3 requires cgo to work
 
 2. Build the application (see Building section above)
 
-3. Run the application:
+3. Create the data directory:
+   ```bash
+   mkdir ../data     # Linux/WSL
+   mkdir ..\data     # Windows
+   ```
+
+4. Run the application:
    ```bash
    ./gemini-pwd      # Linux/WSL
    gemini-pwd.exe    # Windows
    ```
 
-4. Open your browser to `http://localhost:8080`
+5. Open your browser to `http://localhost:7000`
 
 ## Default Credentials
 
@@ -113,6 +119,24 @@ Binary was compiled with 'CGO_ENABLED=0', go-sqlite3 requires cgo to work
 - `PWD_SECRET_KEY`: **REQUIRED** - Must be exactly 32 bytes. Used for AES-256-GCM encryption of all passwords. Application will refuse to start without it.
 
   **⚠️ CRITICAL: Store this key securely! If you lose it, all encrypted passwords become permanently unrecoverable.**
+
+- `PORT`: Optional - Server port (default: `7000`)
+  
+  **To run on a different port:**
+  ```bash
+  # Linux/WSL
+  PORT=8080 ./gemini-pwd
+  
+  # Windows PowerShell
+  $env:PORT="8080"; .\gemini-pwd.exe
+  
+  # Windows Command Prompt
+  set PORT=8080 && gemini-pwd.exe
+  ```
+
+## Database Location
+
+The database is stored at `../data/passwords.db` relative to the application binary. Ensure the `../data` directory exists and has appropriate permissions before running the application.
 
 ## Development
 

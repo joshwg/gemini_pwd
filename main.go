@@ -35,8 +35,8 @@ func startCleanupRoutines() {
 }
 
 func main() {
-	// Initialize the database connection and tables in parent directory
-	initDB("../passwords.db")
+	// Initialize the database connection and tables in data directory
+	initDB("../data/passwords.db")
 
 	// Update any existing tags with empty colors to use the default color
 	if err := updateEmptyTagColors(); err != nil {
