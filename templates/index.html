@@ -518,7 +518,7 @@
         });
 
         // Password form validation
-        function validatePasswordForm() {
+        function validatePasswordForm(skipDuplicateCheck) {
             let isValid = true;
 
             // Validate site field
@@ -550,8 +550,10 @@
                 passwordUsernameValidation.classList.remove('hidden');
                 isValid = false;
             } else {
-                // Check for duplicates asynchronously
-                checkDuplicateAsync(site, username, passwordID.value);
+                // Check for duplicates asynchronously (skip when called back from checkDuplicateAsync to prevent infinite loop)
+                if (!skipDuplicateCheck) {
+                    checkDuplicateAsync(site, username, passwordID.value);
+                }
             }
 
             // Validate password field (optional, but with length limits)
@@ -617,14 +619,14 @@
                         passwordSubmitBtn.classList.remove('hover:bg-blue-700');
                     } else {
                         passwordUsernameValidation.classList.add('hidden');
-                        // Re-run basic validation to update submit button state
-                        validatePasswordForm();
+                        // Re-run basic validation to update submit button state (skip duplicate check to prevent infinite loop)
+                        validatePasswordForm(true);
                     }
                 } catch (e) {
                     console.error('Error in checkDuplicateAsync:', e);
-                    // On error, hide validation and allow form submission
+                    // On error, hide validation and allow form submission (skip duplicate check to prevent infinite loop)
                     passwordUsernameValidation.classList.add('hidden');
-                    validatePasswordForm();
+                    validatePasswordForm(true);
                 }
             } else {
                 passwordUsernameValidation.classList.add('hidden');

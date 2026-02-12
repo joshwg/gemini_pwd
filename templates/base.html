@@ -161,6 +161,25 @@
         </div>
     </div>
 
+    <!-- Idle Warning Modal (non-blocking replacement for confirm()) -->
+    <div id="idleWarningModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" style="z-index: 9999;">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mb-4">
+                    <i class="fas fa-clock text-yellow-600 text-xl"></i>
+                </div>
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Session Expiring</h3>
+                <div class="mt-2 px-7 py-3">
+                    <p class="text-sm text-gray-500">You will be logged out due to inactivity in</p>
+                    <p id="idleCountdown" class="text-3xl font-bold text-red-600 my-4">5:00</p>
+                </div>
+                <div class="mt-4">
+                    <button id="stayLoggedInBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:shadow-outline">Stay Logged In</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const changeMyPasswordBtn = document.getElementById('changeMyPasswordBtn');
@@ -519,60 +538,73 @@
 
             // Idle timeout functionality (30 minutes)
             let idleTimer;
-            let warningTimer;
-            let confirmDeadlineTimer;
+            let countdownInterval;
             const IDLE_TIME = 30 * 60 * 1000; // 30 minutes in milliseconds
-            const WARNING_TIME = 5 * 60 * 1000; // 5 minutes warning before logout
-            const CONFIRM_DEADLINE = 10 * 60 * 1000; // 10 minutes to respond to warning
-            
+            const WARNING_SECONDS = 5 * 60; // 5 minutes warning countdown in seconds
+
             function resetIdleTimer() {
                 clearTimeout(idleTimer);
-                clearTimeout(warningTimer);
-                clearTimeout(confirmDeadlineTimer);
-                
-                // Set warning timer (25 minutes)
-                warningTimer = setTimeout(showIdleWarning, IDLE_TIME - WARNING_TIME);
-                
-                // Set logout timer (30 minutes)
-                idleTimer = setTimeout(logoutUser, IDLE_TIME);
+                clearInterval(countdownInterval);
+                hideIdleWarning();
+
+                // Single timer: show warning 5 minutes before logout
+                idleTimer = setTimeout(showIdleWarning, IDLE_TIME - (WARNING_SECONDS * 1000));
             }
-            
+
             function showIdleWarning() {
-                // Set a deadline for responding to the warning (10 minutes max)
-                const warningShownAt = Date.now();
-                confirmDeadlineTimer = setTimeout(() => {
-                    logoutUser();
-                }, CONFIRM_DEADLINE);
-                
-                const userConfirmed = confirm('You will be logged out in 5 minutes due to inactivity. Click OK to stay logged in.');
-                const responseTime = Date.now() - warningShownAt;
-                
-                // Clear the deadline timer
-                clearTimeout(confirmDeadlineTimer);
-                
-                // If user took more than 10 minutes to respond, logout anyway
-                if (responseTime >= CONFIRM_DEADLINE) {
-                    logoutUser();
-                    return;
+                let remaining = WARNING_SECONDS;
+                const modal = document.getElementById('idleWarningModal');
+                const countdownEl = document.getElementById('idleCountdown');
+
+                function updateCountdown() {
+                    const minutes = Math.floor(remaining / 60);
+                    const seconds = remaining % 60;
+                    countdownEl.textContent = minutes + ':' + String(seconds).padStart(2, '0');
                 }
-                
-                if (userConfirmed) {
-                    resetIdleTimer(); // Reset timer if user wants to stay and responded in time
-                }
+
+                updateCountdown();
+                modal.classList.remove('hidden');
+
+                countdownInterval = setInterval(() => {
+                    remaining--;
+                    if (remaining <= 0) {
+                        clearInterval(countdownInterval);
+                        logoutUser();
+                        return;
+                    }
+                    updateCountdown();
+                }, 1000);
             }
-            
+
+            function hideIdleWarning() {
+                const modal = document.getElementById('idleWarningModal');
+                if (modal) modal.classList.add('hidden');
+            }
+
             function logoutUser() {
-                alert('You have been logged out due to inactivity.');
+                clearInterval(countdownInterval);
                 window.location.href = '/logout';
             }
-            
-            // Track user activity
-            const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-            
-            activityEvents.forEach(event => {
-                document.addEventListener(event, resetIdleTimer, true);
+
+            // "Stay Logged In" button resets everything
+            document.getElementById('stayLoggedInBtn').addEventListener('click', () => {
+                clearInterval(countdownInterval);
+                hideIdleWarning();
+                resetIdleTimer();
             });
-            
+
+            // Track user activity (only reset when warning is not showing)
+            const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+
+            activityEvents.forEach(event => {
+                document.addEventListener(event, () => {
+                    const modal = document.getElementById('idleWarningModal');
+                    if (!modal || modal.classList.contains('hidden')) {
+                        resetIdleTimer();
+                    }
+                }, true);
+            });
+
             // Initialize idle timer on page load
             resetIdleTimer();
         });
