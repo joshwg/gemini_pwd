@@ -147,7 +147,7 @@ func checkRateLimitByUsername(username string) (bool, time.Duration, error) {
 // createSession creates a new session for a user in the database
 func createSession(w http.ResponseWriter, user *User) error {
 	sessionToken := uuid.NewString()
-	expiresAt := time.Now().Add(30 * time.Minute)
+	expiresAt := time.Now().Add(60 * time.Minute)
 
 	// Insert session into database
 	_, err := db.Exec(
