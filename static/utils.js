@@ -3,9 +3,6 @@
 // Gemini PWD Utility Functions
 // Shared functions used across multiple templates
 
-// Constants
-const DEFAULT_TAG_COLOR = '#6B7280'; // dark gray - matches backend defaultTagColor
-
 // Authentication and fetch utilities
 async function handleAuthResponse(response) {
     // Check for authentication errors
@@ -27,7 +24,7 @@ async function handleAuthResponse(response) {
 }
 
 async function authFetch(url, options = {}) {
-    const timeout = options.timeout || 30000; // Default 30 second timeout
+    const timeout = options.timeout || FETCH_TIMEOUT_MS;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
     

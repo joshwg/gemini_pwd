@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     
     <!-- Utility functions -->
+    <script src="/static/constants.js"></script>
     <script src="/static/utils.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -536,11 +537,11 @@
                 });
             }
 
-            // Idle timeout functionality (30 minutes)
+            // Idle timeout functionality
             let idleTimer;
             let countdownInterval;
-            const IDLE_TIME = 30 * 60 * 1000; // 30 minutes in milliseconds
-            const WARNING_SECONDS = 5 * 60; // 5 minutes warning countdown in seconds
+            const IDLE_TIME = IDLE_TIME_MS;
+            const WARNING_SECONDS = IDLE_WARNING_SECONDS;
 
             function resetIdleTimer() {
                 clearTimeout(idleTimer);

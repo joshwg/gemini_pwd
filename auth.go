@@ -18,14 +18,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Rate limiting constants
-const (
-	maxLoginAttempts     = 3
-	cooldownDuration     = 30 * time.Second
-	maxLoginAttemptsHard = 6
-	hardCooldownDuration = 5 * time.Minute
-)
-
 // Define a custom type for context keys to avoid collisions
 type contextKey string
 
@@ -147,7 +139,7 @@ func checkRateLimitByUsername(username string) (bool, time.Duration, error) {
 // createSession creates a new session for a user in the database
 func createSession(w http.ResponseWriter, user *User) error {
 	sessionToken := uuid.NewString()
-	expiresAt := time.Now().Add(60 * time.Minute)
+	expiresAt := time.Now().Add(sessionDuration)
 
 	// Insert session into database
 	_, err := db.Exec(
@@ -223,7 +215,7 @@ func validateSession(sessionToken string) (*User, error) {
 	}
 
 	// Refresh session expiration (sliding window) with timeout
-	newExpiresAt := time.Now().Add(30 * time.Minute)
+	newExpiresAt := time.Now().Add(sessionDuration)
 
 	// Use a background goroutine to avoid blocking the request
 	go func() {
@@ -273,7 +265,7 @@ func cleanupExpiredSessions() {
 
 // cleanupOldLoginAttempts removes old login attempts (older than 24 hours)
 func cleanupOldLoginAttempts() {
-	cutoff := time.Now().Add(-24 * time.Hour)
+	cutoff := time.Now().Add(-loginAttemptsRetentionPeriod)
 	_, err := db.Exec("DELETE FROM login_attempts WHERE attempted_at <= ?", cutoff)
 	if err != nil {
 		logger.Error("Error cleaning up old login attempts", err)
@@ -352,7 +344,7 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		http.SetCookie(w, &http.Cookie{
 			Name:     "session_token",
 			Value:    c.Value,
-			Expires:  time.Now().Add(30 * time.Minute),
+			Expires:  time.Now().Add(sessionDuration),
 			HttpOnly: true,
 			Secure:   false, // Set to true in production with HTTPS
 			SameSite: http.SameSiteLaxMode,

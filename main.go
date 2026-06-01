@@ -17,7 +17,7 @@ import (
 func startCleanupRoutines() {
 	// Clean up expired sessions every 10 minutes
 	go func() {
-		ticker := time.NewTicker(10 * time.Minute)
+		ticker := time.NewTicker(sessionCleanupInterval)
 		defer ticker.Stop()
 		for range ticker.C {
 			cleanupExpiredSessions()
@@ -26,7 +26,7 @@ func startCleanupRoutines() {
 
 	// Clean up old login attempts every hour
 	go func() {
-		ticker := time.NewTicker(1 * time.Hour)
+		ticker := time.NewTicker(loginAttemptsCleanupInterval)
 		defer ticker.Stop()
 		for range ticker.C {
 			cleanupOldLoginAttempts()
@@ -80,7 +80,7 @@ func main() {
 	// Start the server
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "7000"
+		port = defaultServerPort
 	}
 	logger.Info("Starting server on :%s", port)
 	logger.Info("Security features enabled:")

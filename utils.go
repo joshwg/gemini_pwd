@@ -11,9 +11,6 @@ import (
 	"strings"
 )
 
-// Default color for tags created without a color specified
-const defaultTagColor = "#6B7280" // dark gray
-
 // =============================================================================
 // Priority 1: Tag ID Resolution Functions
 // =============================================================================
