@@ -169,6 +169,17 @@ func tagsHandler(w http.ResponseWriter, r *http.Request) {
 	parseTemplate(w, "tags.html", user)
 }
 
+// recentPasswordsHandler serves the "most recently added passwords" browsing page.
+func recentPasswordsHandler(w http.ResponseWriter, r *http.Request) {
+	user, ok := getUserFromContext(r)
+	if !ok || user == nil {
+		httputil.Unauthorized(w, "")
+		return
+	}
+
+	parseTemplate(w, "recent.html", user)
+}
+
 // logoutHandler clears the user's session.
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	clearSession(w, r)
@@ -432,8 +443,14 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Only return passwords if filters are applied (for security)
-		if filter.Query == "" && len(filter.TagIDs) == 0 {
+		// Parse sort parameter (e.g. sort=recent to browse by most recently added)
+		if r.URL.Query().Get("sort") == "recent" {
+			filter.SortRecent = true
+		}
+
+		// Only return passwords if filters are applied, or the caller explicitly
+		// requested the recent-order browse view (for security)
+		if filter.Query == "" && len(filter.TagIDs) == 0 && !filter.SortRecent {
 			// Return empty array when no filters are specified
 			httputil.WriteJSON(w, []PasswordEntry{})
 			return

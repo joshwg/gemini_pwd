@@ -1,0 +1,305 @@
+<!-- Copyright (C) 2025 Joshua Goldstein -->
+
+<!-- templates/recent.html -->
+{{define "title"}}Recent Passwords{{end}}
+
+{{define "content"}}
+<div class="bg-white p-6 rounded-lg shadow-md mb-8">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-4">
+        <h2 class="text-2xl font-semibold">Most Recently Added Passwords</h2>
+        <div class="flex items-center gap-2">
+            <button id="prevPageBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                <i class="fas fa-chevron-left mr-1"></i>Previous 10
+            </button>
+            <button id="nextPageBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Next 10<i class="fas fa-chevron-right ml-1"></i>
+            </button>
+        </div>
+    </div>
+    <div id="passwordCardContainer" class="space-y-4">
+        <!-- Password cards will be populated here by JavaScript -->
+    </div>
+</div>
+</main>
+
+<script>
+    const API_ORIGIN = window.location.origin;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const passwordCardContainer = document.getElementById('passwordCardContainer');
+        const prevPageBtn = document.getElementById('prevPageBtn');
+        const nextPageBtn = document.getElementById('nextPageBtn');
+
+        const PAGE_SIZE = RECENT_PASSWORDS_PAGE_SIZE;
+        let currentOffset = 0;
+        let hasNextPage = false;
+
+        fetchPage(0);
+
+        prevPageBtn.addEventListener('click', () => {
+            if (currentOffset > 0) {
+                fetchPage(Math.max(0, currentOffset - PAGE_SIZE));
+            }
+        });
+
+        nextPageBtn.addEventListener('click', () => {
+            if (hasNextPage) {
+                fetchPage(currentOffset + PAGE_SIZE);
+            }
+        });
+
+        async function fetchPage(offset) {
+            try {
+                const params = new URLSearchParams();
+                params.append('sort', 'recent');
+                // Fetch one extra entry so we know whether a next page exists.
+                params.append('limit', String(PAGE_SIZE + 1));
+                params.append('offset', String(offset));
+
+                const response = await authFetch(API_ORIGIN + '/api/passwords?' + params.toString());
+                if (!response) return; // Auth error handled by authFetch
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error('Failed to fetch passwords: ' + response.status + ' ' + response.statusText + ' - ' + errorText);
+                }
+                const passwords = await response.json() || [];
+
+                hasNextPage = passwords.length > PAGE_SIZE;
+                currentOffset = offset;
+
+                renderPasswords(passwords.slice(0, PAGE_SIZE));
+                updatePaginationButtons();
+            } catch (e) {
+                console.error('Error in fetchPage:', e);
+                alert('Could not fetch passwords. See console for details.');
+            }
+        }
+
+        function updatePaginationButtons() {
+            prevPageBtn.disabled = currentOffset === 0;
+            nextPageBtn.disabled = !hasNextPage;
+        }
+
+        // Event delegation for card buttons
+        passwordCardContainer.addEventListener('click', async (e) => {
+            if (e.target.closest('.delete-password-btn')) {
+                const id = e.target.closest('.delete-password-btn').dataset.id;
+                if (confirm('Are you sure you want to delete this password?')) {
+                    const response = await authFetch(API_ORIGIN + '/api/passwords?id=' + id, { method: 'DELETE' });
+                    if (!response) return; // Auth error handled by authFetch
+                    if (response.ok) {
+                        await fetchPage(currentOffset);
+                    } else {
+                        alert('Failed to delete password.');
+                    }
+                }
+            } else if (e.target.closest('.edit-password-btn')) {
+                const id = e.target.closest('.edit-password-btn').dataset.id;
+                window.location.href = '/dashboard?edit=' + id;
+            } else if (e.target.closest('.copy-password-btn')) {
+                const id = e.target.closest('.copy-password-btn').dataset.id;
+                copyPassword(id);
+            } else if (e.target.closest('.show-password-btn')) {
+                const id = e.target.closest('.show-password-btn').dataset.id;
+                showHidePassword(id);
+            } else if (e.target.closest('.show-notes-btn')) {
+                const id = e.target.closest('.show-notes-btn').dataset.id;
+                showHideNotes(id);
+            }
+        });
+
+        function formatCreatedAt(createdAt) {
+            const date = new Date(createdAt);
+            if (isNaN(date.getTime())) return createdAt;
+            return date.toLocaleString();
+        }
+
+        function renderPasswords(passwords) {
+            passwordCardContainer.innerHTML = '';
+
+            if (passwords.length === 0) {
+                const emptyCard = document.createElement('div');
+                emptyCard.className = 'bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center';
+                emptyCard.innerHTML =
+                    '<div class="flex flex-col items-center">' +
+                        '<i class="fas fa-key text-4xl text-gray-300 mb-4"></i>' +
+                        '<p class="text-lg font-medium text-gray-500 mb-2">No passwords found</p>' +
+                        '<p class="text-sm text-gray-400">Add your first password from the Dashboard to get started</p>' +
+                    '</div>';
+                passwordCardContainer.appendChild(emptyCard);
+                return;
+            }
+
+            passwords.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200';
+                card.id = 'password-card-' + p.id;
+
+                const tagsHTML = p.tags.map(tag => {
+                    const tagColor = getTagColor(tag.color);
+                    const textColor = getTextColor(tagColor);
+                    const borderStyle = getBorderStyle(tagColor);
+                    return '<span class="tag-item text-xs font-semibold inline-block py-0.5 px-2 rounded border mr-1 mb-1" style="background-color: ' + tagColor + '; color: ' + textColor + '; border: ' + borderStyle + ';">' + tag.name + '</span>';
+                }).join('');
+
+                const passwordHTML =
+                    '<div class="flex items-center gap-2 relative flex-wrap">' +
+                        '<input type="password" id="password-' + p.id + '" class="password-display flex-1 py-1 px-2 text-sm border rounded bg-gray-50 min-w-0" placeholder="••••••••" readonly>' +
+                        '<span class="flex items-center gap-1 flex-shrink-0">' +
+                            '<button class="show-password-btn p-1 transform hover:text-blue-500 hover:scale-110" data-id="' + p.id + '" title="Show/Hide password"><i class="fas fa-eye"></i></button>' +
+                            '<button class="copy-password-btn p-1 transform hover:text-green-500 hover:scale-110" data-id="' + p.id + '" title="Copy password to clipboard"><i class="fas fa-copy"></i></button>' +
+                            '<button class="edit-password-btn p-1 transform hover:text-blue-500 hover:scale-110" data-id="' + p.id + '" title="Edit password"><i class="fas fa-edit"></i></button>' +
+                            '<button class="delete-password-btn p-1 transform hover:text-red-500 hover:scale-110" data-id="' + p.id + '" title="Delete password"><i class="fas fa-trash-alt"></i></button>' +
+                        '</span>' +
+                        '<div id="copy-message-' + p.id + '" class="absolute right-0 top-full mt-1 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg hidden z-10">' +
+                            '<i class="fas fa-check mr-1"></i>Copied!' +
+                        '</div>' +
+                    '</div>';
+
+                card.innerHTML =
+                    '<div class="p-4">' +
+                        '<div class="grid grid-cols-1 md:grid-cols-12 gap-4 mb-3">' +
+                            '<div class="md:col-span-3">' +
+                                '<label class="text-xs text-gray-500 uppercase tracking-wide">Site</label>' +
+                                '<div class="font-medium text-gray-900 break-all">' + p.site + '</div>' +
+                            '</div>' +
+                            '<div class="md:col-span-3">' +
+                                '<label class="text-xs text-gray-500 uppercase tracking-wide">Username</label>' +
+                                '<div class="font-medium text-gray-700 break-all">' + p.username + '</div>' +
+                            '</div>' +
+                            '<div class="md:col-span-6">' +
+                                '<label class="text-xs text-gray-500 uppercase tracking-wide">Password</label>' +
+                                '<div class="mt-1">' + passwordHTML + '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-3 border-t border-gray-100">' +
+                            '<div class="tags-container">' +
+                                '<div class="flex items-center mb-2">' +
+                                    '<span class="text-xs text-gray-500 uppercase tracking-wide">Tags</span>' +
+                                '</div>' +
+                                '<div class="flex flex-wrap gap-1">' + tagsHTML + '</div>' +
+                            '</div>' +
+                            '<div class="notes-container">' +
+                                '<div class="flex items-center mb-2">' +
+                                    '<span class="text-xs text-gray-500 uppercase tracking-wide mr-3">Notes</span>' +
+                                    '<button class="show-notes-btn text-xs text-blue-500 hover:text-blue-700 flex items-center" data-id="' + p.id + '" title="Show/Hide notes">' +
+                                        '<i class="fas fa-eye mr-1"></i>Show' +
+                                    '</button>' +
+                                '</div>' +
+                                '<div class="notes-content hidden" id="notes-container-' + p.id + '">' +
+                                    '<textarea id="notes-content-' + p.id + '" class="w-full h-20 p-2 border border-gray-300 rounded text-sm text-gray-700 bg-white resize-vertical" readonly placeholder="Loading notes..."></textarea>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="pt-2 mt-2 border-t border-gray-100 text-xs text-gray-400">Added ' + formatCreatedAt(p.createdAt) + '</div>' +
+                    '</div>';
+
+                passwordCardContainer.appendChild(card);
+            });
+        }
+
+        async function copyPassword(id) {
+            try {
+                const response = await authFetch(API_ORIGIN + '/api/passwords?id=' + id + '&action=copy');
+                if (!response) return; // Auth error handled by authFetch
+                if (!response.ok) throw new Error('Failed to fetch password for copying.');
+                const password = await response.text();
+
+                try {
+                    if (navigator.clipboard && window.isSecureContext) {
+                        await navigator.clipboard.writeText(password);
+                    } else {
+                        const tempInput = document.createElement('input');
+                        tempInput.value = password;
+                        document.body.appendChild(tempInput);
+                        tempInput.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(tempInput);
+                    }
+                } catch (clipboardError) {
+                    const tempInput = document.createElement('input');
+                    tempInput.value = password;
+                    document.body.appendChild(tempInput);
+                    tempInput.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tempInput);
+                }
+
+                const messageElement = document.getElementById('copy-message-' + id);
+                if (messageElement) {
+                    messageElement.classList.remove('hidden');
+                    setTimeout(() => {
+                        messageElement.classList.add('hidden');
+                    }, 2000);
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to copy password: ' + e.message);
+            }
+        }
+
+        async function showHidePassword(id) {
+            const passwordInput = document.getElementById('password-' + id);
+            const eyeIcon = document.querySelector('.show-password-btn[data-id="' + id + '"] i');
+
+            if (passwordInput.type === 'password') {
+                try {
+                    const response = await authFetch(API_ORIGIN + '/api/passwords?id=' + id + '&action=copy');
+                    if (!response) return; // Auth error handled by authFetch
+                    if (!response.ok) throw new Error('Failed to fetch password.');
+                    const password = await response.text();
+                    passwordInput.value = password;
+                    passwordInput.type = 'text';
+                    eyeIcon.classList.remove('fa-eye');
+                    eyeIcon.classList.add('fa-eye-slash');
+                } catch (e) {
+                    console.error(e);
+                    alert('Failed to fetch password: ' + e.message);
+                }
+            } else {
+                passwordInput.value = '';
+                passwordInput.type = 'password';
+                eyeIcon.classList.remove('fa-eye-slash');
+                eyeIcon.classList.add('fa-eye');
+            }
+        }
+
+        async function showHideNotes(id) {
+            const notesContainer = document.getElementById('notes-container-' + id);
+            const notesContent = document.getElementById('notes-content-' + id);
+            const showButton = document.querySelector('.show-notes-btn[data-id="' + id + '"]');
+
+            if (notesContainer.classList.contains('hidden')) {
+                if (notesContent.placeholder === 'Loading notes...') {
+                    notesContent.value = 'Loading...';
+                    try {
+                        const response = await authFetch(API_ORIGIN + '/api/passwords?id=' + id);
+                        if (!response) return; // Auth error handled by authFetch
+                        if (response.ok) {
+                            const password = await response.json();
+                            if (password.notes && password.notes.trim()) {
+                                notesContent.value = password.notes;
+                                notesContent.classList.remove('italic', 'text-gray-400', 'select-none');
+                            } else {
+                                notesContent.value = 'No notes available';
+                                notesContent.classList.add('italic', 'text-gray-400', 'select-none');
+                            }
+                            notesContent.placeholder = '';
+                        } else {
+                            notesContent.value = 'Failed to load notes';
+                        }
+                    } catch (error) {
+                        notesContent.value = 'Error loading notes';
+                    }
+                }
+
+                notesContainer.classList.remove('hidden');
+                showButton.innerHTML = '<i class="fas fa-eye-slash mr-1"></i>Hide';
+            } else {
+                notesContainer.classList.add('hidden');
+                showButton.innerHTML = '<i class="fas fa-eye mr-1"></i>Show';
+            }
+        }
+    });
+</script>
+{{end}}

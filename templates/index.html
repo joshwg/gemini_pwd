@@ -249,7 +249,16 @@
         let selectedTagFilterIds = new Set();
         
         // Fetch tags and show initial empty state on page load
-        fetchTags();
+        fetchTags().then(() => {
+            // Support deep-linking to a specific password's edit modal, e.g. from
+            // the "Show Most Recent Passwords" page.
+            const params = new URLSearchParams(window.location.search);
+            const editId = params.get('edit');
+            if (editId) {
+                fetchPasswordByID(editId);
+                window.history.replaceState({}, '', '/dashboard');
+            }
+        });
         showEmptyFilterState(); // Show the filter prompt instead of loading passwords
 
         // Search functionality

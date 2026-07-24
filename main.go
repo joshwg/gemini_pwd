@@ -65,6 +65,7 @@ func main() {
 	mux.HandleFunc("/logout", authMiddleware(logoutHandler))
 	mux.HandleFunc("/users", authMiddleware(usersHandler))
 	mux.HandleFunc("/tags", authMiddleware(tagsHandler))
+	mux.HandleFunc("/recent-passwords", authMiddleware(recentPasswordsHandler))
 	mux.HandleFunc("/api/users", authMiddleware(usersAPIHandler))
 	mux.HandleFunc("/api/user/password", authMiddleware(changeMyPasswordHandler))
 	mux.HandleFunc("/api/passwords", authMiddleware(passwordsAPIHandler))

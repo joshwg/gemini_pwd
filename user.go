@@ -339,10 +339,11 @@ func getPasswords(userID int, query string) ([]PasswordEntry, error) {
 
 // PasswordFilter represents filtering options for password queries
 type PasswordFilter struct {
-	Query  string // Text search for site/username/tags
-	TagIDs []int  // Specific tag IDs to filter by
-	Limit  int    // Maximum number of results
-	Offset int    // Pagination offset
+	Query      string // Text search for site/username/tags
+	TagIDs     []int  // Specific tag IDs to filter by
+	Limit      int    // Maximum number of results
+	Offset     int    // Pagination offset
+	SortRecent bool   // Order by most recently created first, instead of by site name
 }
 
 // getPasswordsWithFilter retrieves passwords with advanced filtering support
@@ -407,9 +408,12 @@ func getPasswordsWithFilter(userID int, filter PasswordFilter) ([]PasswordEntry,
 	sqlQuery += `
 		GROUP BY
 			pe.id
-		ORDER BY
-			pe.site ASC
 	`
+	if filter.SortRecent {
+		sqlQuery += " ORDER BY pe.created_at DESC, pe.id DESC "
+	} else {
+		sqlQuery += " ORDER BY pe.site ASC "
+	}
 
 	// Add pagination
 	if filter.Limit <= 0 {
