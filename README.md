@@ -149,3 +149,46 @@ Run tests:
 ```bash
 go test ./...
 ```
+
+## Deployment
+
+The `deploy/` directory contains everything needed to deploy Gemini PWD to a Linux server running Apache2 as a reverse proxy, managed by systemd. See [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md) for the full guide (SSL setup, backups, troubleshooting, etc.). The short version:
+
+### 1. Build the deployment package
+
+On your development machine:
+```bash
+chmod +x deploy/build-for-deployment.sh
+./deploy/build-for-deployment.sh
+```
+This cross-compiles the Linux binary and bundles it with `templates/`, `static/`, and `create_base_db.sql` into `deploy/gemini-pwd-<timestamp>.tar.gz`.
+
+### 2. Transfer it to the server
+
+```bash
+scp deploy/gemini-pwd-*.tar.gz user@your-server:/tmp/
+```
+
+### 3. Run `deploy.sh` on the server
+
+`deploy.sh` expects the extracted package at `/tmp/gemini_pwd` and must be run as root:
+
+```bash
+cd /tmp
+tar -xzf gemini-pwd-*.tar.gz
+mv package gemini_pwd
+
+# Run the deployment script (from wherever deploy.sh and its
+# accompanying gemini_pwd.service / apache-gemini_pwd.conf files live,
+# e.g. after also copying the deploy/ directory to the server)
+chmod +x deploy.sh
+sudo ./deploy.sh
+```
+
+`deploy.sh` installs Apache2/ufw/fail2ban, creates a dedicated `geminipwd` system user, copies the application into `/opt/gemini-pwd`, installs the systemd service and Apache vhost, enables the firewall, and starts the service. After it finishes, it prints follow-up steps (SSL certificates, domain name, backups) — see the "Deployment completed!" output or [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md) for details.
+
+Once deployed, manage the service with:
+```bash
+sudo systemctl start|stop|restart|status gemini_pwd
+sudo journalctl -u gemini_pwd -f
+```
