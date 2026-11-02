@@ -15,8 +15,7 @@ The deployment package includes:
 
 - `gemini-pwd` - The compiled Go binary
 - `templates/` - HTML templates directory
-- `create_base_db.sql` - Database initialization script
-- `gemini-pwd.service` - Systemd service configuration
+- `gemini_pwd.service` - Systemd service configuration
 - `apache-gemini-pwd.conf` - Apache virtual host configuration
 - `deploy.sh` - Automated deployment script
 
@@ -50,13 +49,10 @@ On your Linux server:
 ```bash
 # Extract the deployment package
 cd /tmp
-tar -xzf gemini-pwd-*.tar.gz
-mv package gemini-pwd
+tar -xzf gemini-pwd-<timestamp>.tar.gz   # creates /tmp/gemini_pwd/
 
-# Run the deployment script
-cd /path/to/deploy/files
-chmod +x deploy.sh
-sudo ./deploy.sh
+# Run the deployment script (included in the package)
+sudo /tmp/gemini_pwd/deploy.sh
 ```
 
 ## Manual Deployment
@@ -89,7 +85,7 @@ sudo useradd --system --shell /bin/false --home-dir /opt/gemini-pwd --create-hom
 sudo mkdir -p /opt/gemini-pwd
 sudo cp gemini-pwd /opt/gemini-pwd/
 sudo cp -r templates /opt/gemini-pwd/
-sudo cp create_base_db.sql /opt/gemini-pwd/
+sudo cp -r static /opt/gemini-pwd/
 
 # Set permissions
 sudo chown -R geminipwd:geminipwd /opt/gemini-pwd
@@ -99,10 +95,10 @@ sudo chmod +x /opt/gemini-pwd/gemini-pwd
 ### 5. Install Systemd Service
 
 ```bash
-sudo cp gemini-pwd.service /etc/systemd/system/
+sudo cp gemini_pwd.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable gemini-pwd
-sudo systemctl start gemini-pwd
+sudo systemctl enable gemini_pwd
+sudo systemctl start gemini_pwd
 ```
 
 ### 6. Configure Apache
@@ -162,7 +158,6 @@ The application uses environment variables:
 - `PORT` - Port to run on (default: 7000 for deployment)
 - `PWD_BIND_ADDR` - Interface to listen on (default `127.0.0.1`; Apache proxies to `127.0.0.1:7000`)
 - `PWD_INSECURE_COOKIES` - Leave unset in production (session cookies are `Secure` by default)
-- `GIN_MODE` - Set to "release" for production
 
 These are set in the systemd service file.
 
@@ -184,19 +179,19 @@ The deployment includes:
 
 ```bash
 # Start the service
-sudo systemctl start gemini-pwd
+sudo systemctl start gemini_pwd
 
 # Stop the service
-sudo systemctl stop gemini-pwd
+sudo systemctl stop gemini_pwd
 
 # Restart the service
-sudo systemctl restart gemini-pwd
+sudo systemctl restart gemini_pwd
 
 # Check status
-sudo systemctl status gemini-pwd
+sudo systemctl status gemini_pwd
 
 # View logs
-sudo journalctl -u gemini-pwd -f
+sudo journalctl -u gemini_pwd -f
 
 # View Apache logs
 sudo tail -f /var/log/apache2/gemini-pwd_error.log
@@ -230,8 +225,8 @@ sudo crontab -e
 
 ```bash
 # Check service status and logs
-sudo systemctl status gemini-pwd
-sudo journalctl -u gemini-pwd -n 50
+sudo systemctl status gemini_pwd
+sudo journalctl -u gemini_pwd -n 50
 
 # Common issues:
 # - Port already in use
@@ -268,7 +263,7 @@ sudo chown geminipwd:geminipwd $PWD_DB_FILE
 
 ```bash
 # Real-time application logs
-sudo journalctl -u gemini-pwd -f
+sudo journalctl -u gemini_pwd -f
 
 # Real-time Apache logs
 sudo tail -f /var/log/apache2/gemini-pwd_access.log
@@ -295,11 +290,14 @@ Consider installing monitoring tools like:
 
 ## Updating the Application
 
-1. Build new version using `build-for-deployment.sh`
-2. Stop the service: `sudo systemctl stop gemini-pwd`
-3. Backup the database: `cp $PWD_DB_FILE /tmp/`
-4. Replace the binary: `sudo cp gemini-pwd /opt/gemini-pwd/`
-5. Update templates if needed: `sudo cp -r templates /opt/gemini-pwd/`
-6. Set permissions: `sudo chown geminipwd:geminipwd /opt/gemini-pwd/gemini-pwd`
-7. Start the service: `sudo systemctl start gemini-pwd`
+Do not re-run `deploy.sh` on an existing server (it does a full system setup and overwrites the Apache vhost). Instead:
+
+1. Build new version using `build-for-deployment.sh`, copy it to the server, and extract it in `/tmp` (creates `/tmp/gemini_pwd/`)
+2. Stop the service: `sudo systemctl stop gemini_pwd`
+3. Backup the database: `sudo cp <your PWD_DB_FILE> <your PWD_DB_FILE>.bak-$(date +%F)`
+4. Replace the binary: `sudo cp /tmp/gemini_pwd/gemini-pwd /opt/gemini-pwd/`
+5. Replace templates and static files: `sudo rm -rf /opt/gemini-pwd/templates /opt/gemini-pwd/static && sudo cp -r /tmp/gemini_pwd/templates /tmp/gemini_pwd/static /opt/gemini-pwd/`
+6. Set ownership: `sudo chown -R geminipwd:geminipwd /opt/gemini-pwd`
+7. Start the service: `sudo systemctl start gemini_pwd`
+8. Check the logs: `sudo journalctl -u gemini_pwd -n 20`
 

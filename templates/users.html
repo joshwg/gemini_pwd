@@ -110,6 +110,8 @@
 </main>
 
 <script>
+    // ID of the logged-in admin (template data is the current user)
+    const currentUserId = {{.ID}};
     document.addEventListener('DOMContentLoaded', () => {
         const userTableBody = document.getElementById('userTableBody');
         const createUserForm = document.getElementById('createUserForm');
@@ -132,6 +134,7 @@
         const editUsernameValidation = document.getElementById('editUsernameValidation');
         
         let currentUsername = null;
+        let currentIsAdmin = false;
         let allUsers = []; // Store all users for validation
 
         // Fetch and render users on page load
@@ -431,12 +434,25 @@
             } else if (e.target.closest('.edit-btn')) {
                 currentUsername = e.target.closest('.edit-btn').dataset.username;
                 const isAdmin = e.target.closest('.edit-btn').dataset.isadmin === 'true';
+                const isSelf = Number(e.target.closest('.edit-btn').dataset.userid) === currentUserId;
+                currentIsAdmin = isAdmin;
                 document.getElementById('editUsername').value = currentUsername;
-                document.getElementById('editIsAdmin').checked = isAdmin;
+                const editIsAdmin = document.getElementById('editIsAdmin');
+                editIsAdmin.checked = isAdmin;
+                // Admins cannot change their own admin status
+                editIsAdmin.disabled = isSelf;
+                editIsAdmin.title = isSelf ? 'You cannot change your own admin status' : '';
                 editUserModal.classList.remove('hidden');
                 // Trigger validation for the current username
                 validateEditUserForm();
             } else if (e.target.closest('.change-password-btn')) {
+                // Changing your own password requires your current password, which
+                // this admin form doesn't ask for; use the "Change Password" menu form.
+                if (Number(e.target.closest('.change-password-btn').dataset.userid) === currentUserId) {
+                    const myPasswordBtn = document.getElementById('changeMyPasswordBtn');
+                    if (myPasswordBtn) myPasswordBtn.click();
+                    return;
+                }
                 currentUsername = e.target.closest('.change-password-btn').dataset.username;
                 document.getElementById('changePasswordUser').textContent = currentUsername;
                 // Reset form fields
@@ -464,48 +480,39 @@
                 return;
             }
             
-            const formData = new FormData(e.target);
-            const newUsername = formData.get('username').trim();
-            const isAdmin = formData.get('isAdmin') === 'on';
+            const newUsername = document.getElementById('editUsername').value.trim();
+            const isAdmin = document.getElementById('editIsAdmin').checked;
 
-            let updatePromises = [];
-
-            // Update username if it has changed
+            // Send a single request with only the fields that changed. The server
+            // identifies the user by the original username and applies the rename
+            // and admin-status change together, so they can't race each other.
+            const payload = { username: currentUsername };
             if (newUsername !== currentUsername) {
-                const renamePayload = { username: currentUsername, newUsername: newUsername };
-                const renamePromise = authFetch(`${window.location.origin}/api/users`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(renamePayload)
-                });
-                updatePromises.push(renamePromise);
+                payload.newUsername = newUsername;
+            }
+            if (isAdmin !== currentIsAdmin) {
+                payload.isAdmin = isAdmin;
+            }
+            if (Object.keys(payload).length === 1) {
+                editUserModal.classList.add('hidden'); // nothing changed
+                return;
             }
 
-            // Always update admin status
-            const adminPayload = { username: newUsername, isAdmin: isAdmin };
-            const adminPromise = authFetch(`${window.location.origin}/api/users`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(adminPayload)
-            });
-            updatePromises.push(adminPromise);
-
             try {
-                const responses = await Promise.all(updatePromises);
-                const allOk = responses.every(res => res.ok);
+                const response = await authFetch(`${window.location.origin}/api/users`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response) return; // Auth error handled by authFetch
 
-                if (allOk) {
+                if (response.ok) {
                     console.log('User updated successfully!');
                     editUserModal.classList.add('hidden');
                     fetchUsers();
                 } else {
                     console.error('Failed to update user.');
-                    for (const res of responses) {
-                        if (!res.ok) {
-                            const errorText = await res.text();
-                            alert('Error: ' + errorText);
-                        }
-                    }
+                    alert('Error: ' + await response.text());
                 }
             } catch (error) {
                 console.error('An error occurred during user update:', error);
@@ -634,10 +641,10 @@
                         </td>
                         <td class="py-3 px-6 text-center">
                             <div class="flex item-center justify-center">
-                                <button class="edit-btn w-4 mr-2 transform hover:text-blue-500 hover:scale-110" data-username="${user.Username}" data-isadmin="${user.IsAdmin}">
+                                <button data-userid="${user.ID}" class="edit-btn w-4 mr-2 transform hover:text-blue-500 hover:scale-110" data-username="${user.Username}" data-isadmin="${user.IsAdmin}">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="change-password-btn w-4 mr-2 transform hover:text-orange-500 hover:scale-110" data-username="${user.Username}">
+                                <button data-userid="${user.ID}" class="change-password-btn w-4 mr-2 transform hover:text-orange-500 hover:scale-110" data-username="${user.Username}">
                                     <i class="fas fa-key"></i>
                                 </button>
                                 <button class="delete-btn w-4 mr-2 transform hover:text-red-500 hover:scale-110" data-username="${user.Username}">

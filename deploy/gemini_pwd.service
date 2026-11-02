@@ -12,10 +12,12 @@ Group=geminipwd
 WorkingDirectory=/opt/gemini-pwd
 ExecStart=/opt/gemini-pwd/gemini-pwd
 Environment=PORT=7000
-# REQUIRED: absolute path to your production database file. The service will
-# refuse to start until this is set (e.g. via `systemctl edit gemini_pwd`).
+# REQUIRED: PWD_SECRET_KEY and PWD_DB_FILE (absolute path). The service refuses
+# to start without them. deploy.sh writes them to /etc/gemini_pwd.env and adds a
+# drop-in (gemini_pwd.service.d/deploy.conf) with EnvironmentFile= and
+# ReadWritePaths= for the database directory. To set them by hand instead, use
+# `systemctl edit gemini_pwd`.
 #Environment=PWD_DB_FILE=/absolute/path/to/passwords.db
-Environment=GIN_MODE=release
 
 # Security settings
 NoNewPrivileges=true

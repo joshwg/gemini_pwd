@@ -1365,3 +1365,45 @@ func TestLoginHandler_UnknownPath(t *testing.T) {
 		t.Errorf("expected 404 for unknown path, got %d", rr.Code)
 	}
 }
+
+// TestUsersAPIHandler_RenameAndAdminTogether verifies a single PUT can rename a user
+// and change their admin status (the status change must apply to the renamed user).
+func TestUsersAPIHandler_RenameAndAdminTogether(t *testing.T) {
+	ensureTestDB()
+	if err := createUser(nil, "boss", "pw123456", true, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := createUser(nil, "alice", "pw123456", false, true); err != nil {
+		t.Fatal(err)
+	}
+	var bossID int
+	db.QueryRow("SELECT id FROM users WHERE username = 'boss'").Scan(&bossID)
+	admin := &User{ID: bossID, Username: "boss", IsAdmin: true}
+
+	body := `{"username":"alice","newUsername":"alice2","isAdmin":true}`
+	rr := httptest.NewRecorder()
+	usersAPIHandler(rr, newRequestWithUser(http.MethodPut, "/api/users", body, admin))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var isAdmin bool
+	if err := db.QueryRow("SELECT is_admin FROM users WHERE username = 'alice2'").Scan(&isAdmin); err != nil {
+		t.Fatalf("renamed user not found: %v", err)
+	}
+	if !isAdmin {
+		t.Error("admin status was not applied to the renamed user")
+	}
+
+	// Editing your own row with an unchanged admin flag must succeed;
+	// actually changing it must fail.
+	rr = httptest.NewRecorder()
+	usersAPIHandler(rr, newRequestWithUser(http.MethodPut, "/api/users", `{"username":"boss","isAdmin":true}`, admin))
+	if rr.Code != http.StatusOK {
+		t.Errorf("unchanged self admin status should succeed, got %d: %s", rr.Code, rr.Body.String())
+	}
+	rr = httptest.NewRecorder()
+	usersAPIHandler(rr, newRequestWithUser(http.MethodPut, "/api/users", `{"username":"boss","isAdmin":false}`, admin))
+	if rr.Code == http.StatusOK {
+		t.Error("removing your own admin status should fail")
+	}
+}

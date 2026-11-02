@@ -116,20 +116,24 @@ func renameUser(admin *User, userID int, newUsername string) error {
 	return nil
 }
 
-// changeAdminStatus (Admin only)
-func changeAdminStatus(admin *User, targetUsername string, newStatus bool) error {
+// changeAdminStatus (Admin only). The target is identified by ID so this works
+// in the same request as a rename.
+func changeAdminStatus(admin *User, targetUserID int, newStatus bool) error {
 	if admin == nil || !admin.IsAdmin {
 		return fmt.Errorf("permission denied: only administrators can change admin status")
 	}
-	if strings.EqualFold(admin.Username, targetUsername) {
+	if admin.ID == targetUserID {
 		if newStatus == admin.IsAdmin {
 			return nil // no change requested; allows admins to edit their own row
 		}
 		return fmt.Errorf("cannot change your own admin status")
 	}
-	_, err := db.Exec("UPDATE users SET is_admin = ? WHERE username = ? COLLATE NOCASE", newStatus, targetUsername)
+	res, err := db.Exec("UPDATE users SET is_admin = ? WHERE id = ?", newStatus, targetUserID)
 	if err != nil {
 		return fmt.Errorf("failed to update admin status: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("user not found")
 	}
 	return nil
 }

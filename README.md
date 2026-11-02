@@ -167,7 +167,7 @@ On your development machine:
 chmod +x deploy/build-for-deployment.sh
 ./deploy/build-for-deployment.sh
 ```
-This cross-compiles the Linux binary and bundles it with `templates/`, `static/`, and `create_base_db.sql` into `deploy/gemini-pwd-<timestamp>.tar.gz`.
+This runs the tests, builds the Linux amd64 binary (CGO is required for SQLite, so build on linux/amd64, e.g. WSL), and bundles it with `templates/`, `static/`, `deploy.sh`, `gemini_pwd.service`, and `apache-gemini_pwd.conf` into `deploy/gemini-pwd-<timestamp>.tar.gz`. The archive extracts to a single `gemini_pwd/` directory. Set `SKIP_TESTS=1` to skip the tests.
 
 ### 2. Transfer it to the server
 
@@ -177,21 +177,17 @@ scp deploy/gemini-pwd-*.tar.gz user@your-server:/tmp/
 
 ### 3. Run `deploy.sh` on the server
 
-`deploy.sh` expects the extracted package at `/tmp/gemini_pwd` and must be run as root:
+`deploy.sh` is included in the package and installs from its own directory; it must be run as root.
+
+On a first deployment it asks for `PWD_DB_FILE` (absolute path) and `PWD_SECRET_KEY` (32 bytes, typed without echo) unless they're already in the environment, and stores them in `/etc/gemini_pwd.env` (root-only). If that file already exists it is reused, never overwritten.
 
 ```bash
 cd /tmp
-tar -xzf gemini-pwd-*.tar.gz
-mv package gemini_pwd
-
-# Run the deployment script (from wherever deploy.sh and its
-# accompanying gemini_pwd.service / apache-gemini_pwd.conf files live,
-# e.g. after also copying the deploy/ directory to the server)
-chmod +x deploy.sh
-sudo ./deploy.sh
+tar -xzf gemini-pwd-<timestamp>.tar.gz   # creates /tmp/gemini_pwd/
+sudo /tmp/gemini_pwd/deploy.sh
 ```
 
-`deploy.sh` installs Apache2/ufw/fail2ban, creates a dedicated `geminipwd` system user, copies the application into `/opt/gemini-pwd`, installs the systemd service and Apache vhost, enables the firewall, and starts the service. After it finishes, it prints follow-up steps (SSL certificates, domain name, backups) — see the "Deployment completed!" output or [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md) for details.
+`deploy.sh` is for first-time setup of a server: it installs Apache2/ufw/fail2ban, creates a dedicated `geminipwd` system user, copies the application into `/opt/gemini-pwd`, installs the systemd service and Apache vhost, enables the firewall, and starts the service. After it finishes, it prints follow-up steps (SSL certificates, domain name, backups) — see the "Deployment completed!" output or [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md) for details.
 
 Once deployed, manage the service with:
 ```bash

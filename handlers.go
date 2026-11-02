@@ -277,7 +277,7 @@ func usersAPIHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if data.IsAdmin != nil {
-			if err := changeAdminStatus(currentUser, data.Username, *data.IsAdmin); err != nil {
+			if err := changeAdminStatus(currentUser, targetUserID, *data.IsAdmin); err != nil {
 				httputil.InternalServerError(w, err.Error(), err)
 				logger.Error("Error changing admin status", err)
 				return
