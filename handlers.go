@@ -35,6 +35,13 @@ func renderStandaloneTemplate(w http.ResponseWriter, name string) {
 
 // loginHandler serves the login page and handles login requests.
 func loginHandler(w http.ResponseWriter, r *http.Request) {
+	// "/" is a catch-all pattern in ServeMux; reject unknown paths so a request to a
+	// mistyped/nonexistent endpoint fails loudly instead of redirecting to a 200 page.
+	if r.URL.Path != "/" && r.URL.Path != "/login" {
+		http.NotFound(w, r)
+		return
+	}
+
 	// Check if user is already authenticated and redirect to dashboard
 	if c, err := r.Cookie("session_token"); err == nil {
 		if user, err := validateSession(c.Value); err == nil && user != nil {
@@ -189,7 +196,11 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 // usersAPIHandler provides a RESTful interface for user management (for admins).
 func usersAPIHandler(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := getUserFromContext(r)
-	if !ok || currentUser == nil || !currentUser.IsAdmin {
+	if !ok || currentUser == nil {
+		httputil.Unauthorized(w, "User not authenticated")
+		return
+	}
+	if !currentUser.IsAdmin {
 		httputil.Forbidden(w, "Forbidden")
 		logger.Security("API access denied for non-admin user", map[string]interface{}{
 			"user_id":  currentUser.ID,
@@ -507,6 +518,7 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		httputil.WriteJSON(w, createdPassword)
 	case http.MethodDelete:
@@ -854,24 +866,13 @@ func checkPasswordDuplicateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check for existing password entry (unique by site and username)
-	var count int
-	var err error
-
-	if request.ID > 0 {
-		// Edit mode - exclude the current entry from duplicate check
-		err = db.QueryRow("SELECT COUNT(*) FROM password_entries WHERE user_id = ? AND site = ? AND username = ? AND id != ? COLLATE NOCASE",
-			currentUser.ID, request.Site, request.Username, request.ID).Scan(&count)
-	} else {
-		// Add mode - check for any duplicates
-		err = db.QueryRow("SELECT COUNT(*) FROM password_entries WHERE user_id = ? AND site = ? AND username = ? COLLATE NOCASE",
-			currentUser.ID, request.Site, request.Username).Scan(&count)
-	}
-
+	// Check for existing password entry (unique by site and username).
+	// In edit mode, exclude the entry being edited.
+	exists, err := CheckDuplicatePasswordEntry(currentUser.ID, request.Site, request.Username, request.ID)
 	if err != nil {
 		httputil.InternalServerError(w, "Database error", err)
 		return
 	}
 
-	api.WriteDuplicateCheckResponse(w, count > 0)
+	api.WriteDuplicateCheckResponse(w, exists)
 }

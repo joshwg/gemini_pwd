@@ -122,6 +122,9 @@ func changeAdminStatus(admin *User, targetUsername string, newStatus bool) error
 		return fmt.Errorf("permission denied: only administrators can change admin status")
 	}
 	if strings.EqualFold(admin.Username, targetUsername) {
+		if newStatus == admin.IsAdmin {
+			return nil // no change requested; allows admins to edit their own row
+		}
 		return fmt.Errorf("cannot change your own admin status")
 	}
 	_, err := db.Exec("UPDATE users SET is_admin = ? WHERE username = ? COLLATE NOCASE", newStatus, targetUsername)

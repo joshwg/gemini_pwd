@@ -226,7 +226,7 @@ func validateSession(sessionToken string) (*User, error) {
 		// Retry logic for database locks
 		maxRetries := 3
 		for i := 0; i < maxRetries; i++ {
-			_, err = db.ExecContext(ctx, "UPDATE sessions SET expires_at = ? WHERE id = ?", newExpiresAt, sessionToken)
+			_, err := db.ExecContext(ctx, "UPDATE sessions SET expires_at = ? WHERE id = ?", newExpiresAt, sessionToken)
 			if err == nil {
 				return // Success
 			}

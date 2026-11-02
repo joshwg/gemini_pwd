@@ -297,17 +297,20 @@
                     };
 
                     try {
-                        const response = await authFetch('/api/change-password', {
-                            method: 'POST',
+                        const response = await authFetch('/api/user/password', {
+                            method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(data),
                         });
 
                         if (!response) return; // Auth error handled by authFetch
                         if (response.ok) {
-                            alert('Password changed successfully!');
+                            // The server invalidates all sessions on password change,
+                            // so send the user back to the login page.
+                            alert('Password changed successfully! Please log in with your new password.');
                             changeMyPasswordModal.classList.add('hidden');
                             changeMyPasswordForm.reset();
+                            window.location.href = '/';
                         } else {
                             const errorText = await response.text();
                             alert(`Error: ${errorText}`);

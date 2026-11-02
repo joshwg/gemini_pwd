@@ -1322,3 +1322,46 @@ func TestRateLimitCheckAPI(t *testing.T) {
 		}
 	})
 }
+
+// TestChangeMyPasswordHandler_SuperUser verifies the super user can change their own
+// password via the self-service endpoint and that the new password persists.
+func TestChangeMyPasswordHandler_SuperUser(t *testing.T) {
+	ensureTestDB()
+	if err := createUser(nil, "super", "abcd1234", true, true); err != nil {
+		t.Fatalf("failed to create super user: %v", err)
+	}
+	var id int
+	db.QueryRow("SELECT id FROM users WHERE username = 'super'").Scan(&id)
+	super := &User{ID: id, Username: "super", IsAdmin: true}
+
+	body := `{"currentPassword":"abcd1234","newPassword":"newSecret99"}`
+	req := newRequestWithUser(http.MethodPut, "/api/user/password", body, super)
+	rr := httptest.NewRecorder()
+	changeMyPasswordHandler(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if _, err := authenticateUser("super", "newSecret99"); err != nil {
+		t.Errorf("new password should authenticate: %v", err)
+	}
+	if _, err := authenticateUser("super", "abcd1234"); err == nil {
+		t.Errorf("old default password should no longer authenticate")
+	}
+
+	// Re-running initDB (server restart) must not reset the password.
+	initDB("test_passwords.db")
+	if _, err := authenticateUser("super", "newSecret99"); err != nil {
+		t.Errorf("password was reset after restart: %v", err)
+	}
+}
+
+// TestLoginHandler_UnknownPath ensures the "/" catch-all doesn't swallow unknown routes.
+func TestLoginHandler_UnknownPath(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/change-password", nil)
+	rr := httptest.NewRecorder()
+	loginHandler(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for unknown path, got %d", rr.Code)
+	}
+}
