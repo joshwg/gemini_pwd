@@ -89,3 +89,37 @@ func TestSessionExpiration(t *testing.T) {
 		t.Errorf("Expected status %v for expired session, but got %v", http.StatusFound, status)
 	}
 }
+
+func TestSessionCookieSecureFlag(t *testing.T) {
+	cases := []struct {
+		env        string
+		wantSecure bool
+	}{
+		{"", true},
+		{"0", true},
+		{"1", false},
+		{"true", false},
+		{"YES", false},
+	}
+	for _, tc := range cases {
+		t.Setenv(insecureCookiesEnvVar, tc.env)
+
+		rr := httptest.NewRecorder()
+		setSessionCookie(rr, "tok", time.Now().Add(time.Hour))
+		c := rr.Result().Cookies()[0]
+		if c.Secure != tc.wantSecure {
+			t.Errorf("%s=%q: Secure=%v, want %v", insecureCookiesEnvVar, tc.env, c.Secure, tc.wantSecure)
+		}
+		if !c.HttpOnly || c.SameSite != http.SameSiteLaxMode || c.Path != "/" {
+			t.Errorf("unexpected cookie attributes: %+v", c)
+		}
+
+		// Deletion must carry the same attributes and expire immediately.
+		rr = httptest.NewRecorder()
+		setSessionCookie(rr, "", time.Time{})
+		d := rr.Result().Cookies()[0]
+		if d.MaxAge >= 0 || d.Value != "" || d.Secure != tc.wantSecure {
+			t.Errorf("bad deletion cookie: %+v", d)
+		}
+	}
+}

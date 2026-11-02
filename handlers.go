@@ -43,7 +43,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if user is already authenticated and redirect to dashboard
-	if c, err := r.Cookie("session_token"); err == nil {
+	if c, err := r.Cookie(sessionCookieName); err == nil {
 		if user, err := validateSession(c.Value); err == nil && user != nil {
 			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 			return

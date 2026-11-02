@@ -4,12 +4,29 @@
 package main
 
 import (
+	"fmt"
 	"gemini-pwd/pkg/logger"
 	"gemini-pwd/pkg/template"
+	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 )
+
+// dbFilePathFromEnv returns the database file path from PWD_DB_FILE.
+// There is no default: the path must be set and must be absolute, so the
+// server never silently creates a fresh database based on the working directory.
+func dbFilePathFromEnv() (string, error) {
+	path := os.Getenv(dbFileEnvVar)
+	if path == "" {
+		return "", fmt.Errorf("%s environment variable is not set; it must be an absolute path to the database file", dbFileEnvVar)
+	}
+	if !filepath.IsAbs(path) {
+		return "", fmt.Errorf("%s must be an absolute path, got %q", dbFileEnvVar, path)
+	}
+	return filepath.Clean(path), nil
+}
 
 // The 'db' variable is declared in database.go and is accessible here.
 
@@ -35,8 +52,13 @@ func startCleanupRoutines() {
 }
 
 func main() {
-	// Initialize the database connection and tables in data directory
-	initDB("../data/passwords.db")
+	// Initialize the database connection and tables at the configured path
+	dbPath, err := dbFilePathFromEnv()
+	if err != nil {
+		logger.Fatal("Invalid database configuration. Refusing to start.", err)
+	}
+	logger.Info("Using database file: %s", dbPath)
+	initDB(dbPath)
 
 	// Update any existing tags with empty colors to use the default color
 	if err := updateEmptyTagColors(); err != nil {
@@ -83,13 +105,21 @@ func main() {
 	if port == "" {
 		port = defaultServerPort
 	}
-	logger.Info("Starting server on :%s", port)
+	bindAddr := os.Getenv(bindAddrEnvVar)
+	if bindAddr == "" {
+		bindAddr = defaultBindAddr
+	}
+	listenAddr := net.JoinHostPort(bindAddr, port)
+	logger.Info("Starting server on %s", listenAddr)
+	if !secureCookiesEnabled() {
+		logger.Warning("%s is set: session cookies are NOT marked Secure. Do not use this in production.", insecureCookiesEnvVar)
+	}
 	logger.Info("Security features enabled:")
 	logger.Info("- Database-backed sessions")
 	logger.Info("- Rate limiting on login attempts")
 	logger.Info("- Security headers")
 	logger.Info("- Session invalidation on password change")
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
+	if err := http.ListenAndServe(listenAddr, mux); err != nil {
 		logger.Fatal("Server failed to start: %v", err, nil)
 	}
 }

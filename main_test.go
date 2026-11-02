@@ -49,3 +49,28 @@ func TestDatabaseInitialization(t *testing.T) {
 		t.Fatalf("failed to ping database: %v", err)
 	}
 }
+
+func TestDBFilePathFromEnv(t *testing.T) {
+	cases := []struct {
+		name    string
+		value   string
+		wantErr bool
+	}{
+		{"unset", "", true},
+		{"relative", "../data/passwords.db", true},
+		{"bare filename", "passwords.db", true},
+		{"absolute", "/opt/data/passwords.db", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(dbFileEnvVar, tc.value)
+			path, err := dbFilePathFromEnv()
+			if tc.wantErr && err == nil {
+				t.Errorf("expected error for %q, got path %q", tc.value, path)
+			}
+			if !tc.wantErr && (err != nil || path != tc.value) {
+				t.Errorf("expected %q, got %q (err %v)", tc.value, path, err)
+			}
+		})
+	}
+}

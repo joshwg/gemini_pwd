@@ -120,6 +120,12 @@ Binary was compiled with 'CGO_ENABLED=0', go-sqlite3 requires cgo to work
 
   **⚠️ CRITICAL: Store this key securely! If you lose it, all encrypted passwords become permanently unrecoverable.**
 
+- `PWD_DB_FILE`: **REQUIRED** - Absolute path to the SQLite database file. There is no default; the application refuses to start if it is unset or relative. The file is created on first run if it doesn't exist, but its directory must already exist.
+
+- `PWD_BIND_ADDR`: Optional - Interface to listen on (default: `127.0.0.1`, loopback only). The server is meant to sit behind an HTTPS reverse proxy on the same host. Set to `0.0.0.0` to listen on all interfaces (e.g. to reach a WSL dev server from Windows).
+
+- `PWD_INSECURE_COOKIES`: Optional - Set to `1` to drop the `Secure` flag from session cookies. **Development only**, for plain-HTTP access via a non-localhost hostname. Not needed behind an HTTPS proxy, nor for `http://localhost` in Chrome/Firefox. Logs a warning at startup when set.
+
 - `PORT`: Optional - Server port (default: `7000`)
   
   **To run on a different port:**
@@ -136,7 +142,7 @@ Binary was compiled with 'CGO_ENABLED=0', go-sqlite3 requires cgo to work
 
 ## Database Location
 
-The database is stored at `../data/passwords.db` relative to the application binary. Ensure the `../data` directory exists and has appropriate permissions before running the application.
+The database is stored at the absolute path given by `PWD_DB_FILE`. Ensure its directory exists and is writable by the application user before running the application.
 
 ## Development
 

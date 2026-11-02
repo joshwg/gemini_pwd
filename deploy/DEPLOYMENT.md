@@ -158,14 +158,17 @@ SSLCertificateKeyFile /path/to/your/private.key
 
 The application uses environment variables:
 
+- `PWD_DB_FILE` - **Required** absolute path to the database file (no default; set it in the service file)
 - `PORT` - Port to run on (default: 7000 for deployment)
+- `PWD_BIND_ADDR` - Interface to listen on (default `127.0.0.1`; Apache proxies to `127.0.0.1:7000`)
+- `PWD_INSECURE_COOKIES` - Leave unset in production (session cookies are `Secure` by default)
 - `GIN_MODE` - Set to "release" for production
 
 These are set in the systemd service file.
 
 ### Database
 
-The application will automatically create `passwords.db` in the application directory on first run.
+The application creates the database at `PWD_DB_FILE` on first run if it doesn't exist. Its directory must already exist and be writable by `geminipwd`.
 
 ### Security Features
 
@@ -212,7 +215,7 @@ sudo nano /opt/gemini-pwd/backup.sh
 DATE=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR="/opt/gemini-pwd/backups"
 mkdir -p "$BACKUP_DIR"
-cp /opt/passwords.db "$BACKUP_DIR/passwords_$DATE.db"
+cp $PWD_DB_FILE "$BACKUP_DIR/passwords_$DATE.db"
 find "$BACKUP_DIR" -name "passwords_*.db" -mtime +30 -delete
 
 # Make executable and add to cron
@@ -253,10 +256,10 @@ sudo tail -f /var/log/apache2/error.log
 
 ```bash
 # Check database permissions
-ls -la /opt/passwords.db
+ls -la $PWD_DB_FILE
 
 # Ensure the geminipwd user can read/write
-sudo chown geminipwd:geminipwd /opt/passwords.db
+sudo chown geminipwd:geminipwd $PWD_DB_FILE
 ```
 
 ## Monitoring
@@ -294,7 +297,7 @@ Consider installing monitoring tools like:
 
 1. Build new version using `build-for-deployment.sh`
 2. Stop the service: `sudo systemctl stop gemini-pwd`
-3. Backup the database: `cp /opt/passwords.db /tmp/`
+3. Backup the database: `cp $PWD_DB_FILE /tmp/`
 4. Replace the binary: `sudo cp gemini-pwd /opt/gemini-pwd/`
 5. Update templates if needed: `sudo cp -r templates /opt/gemini-pwd/`
 6. Set permissions: `sudo chown geminipwd:geminipwd /opt/gemini-pwd/gemini-pwd`

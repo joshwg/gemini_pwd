@@ -10,6 +10,7 @@ import (
 	"gemini-pwd/pkg/httputil"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -150,23 +151,46 @@ func createSession(w http.ResponseWriter, user *User) error {
 		return err
 	}
 
-	// Set secure cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_token",
-		Value:    sessionToken,
+	setSessionCookie(w, sessionToken, expiresAt)
+	return nil
+}
+
+// secureCookiesEnabled reports whether session cookies get the Secure flag.
+// On by default; set PWD_INSECURE_COOKIES=1 only for plain-HTTP development on a
+// non-localhost host. Behind an HTTPS reverse proxy this must stay enabled: the
+// flag tells the browser to send the cookie only over HTTPS, which is how the
+// browser reaches the proxy even though the proxy talks plain HTTP to us.
+func secureCookiesEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(insecureCookiesEnvVar))) {
+	case "1", "true", "yes":
+		return false
+	}
+	return true
+}
+
+// setSessionCookie writes the session cookie. All session cookie writes go
+// through here so the security attributes stay consistent.
+// A zero expiresAt deletes the cookie.
+func setSessionCookie(w http.ResponseWriter, value string, expiresAt time.Time) {
+	cookie := &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    value,
 		Expires:  expiresAt,
-		HttpOnly: true,  // Prevent XSS
-		Secure:   false, // Set to true in production with HTTPS
+		HttpOnly: true, // Not readable from JavaScript (mitigates XSS token theft)
+		Secure:   secureCookiesEnabled(),
 		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
-	})
-
-	return nil
+	}
+	if expiresAt.IsZero() {
+		cookie.Expires = time.Unix(0, 0)
+		cookie.MaxAge = -1
+	}
+	http.SetCookie(w, cookie)
 }
 
 // clearSession removes a user's session from database and cookie
 func clearSession(w http.ResponseWriter, r *http.Request) {
-	c, err := r.Cookie("session_token")
+	c, err := r.Cookie(sessionCookieName)
 	if err != nil {
 		// If the cookie is not found, there's nothing to clear.
 		return
@@ -179,16 +203,7 @@ func clearSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Clear cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_token",
-		Value:    "",
-		Expires:  time.Unix(0, 0),
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   false, // Set to true in production with HTTPS
-		SameSite: http.SameSiteLaxMode,
-		Path:     "/",
-	})
+	setSessionCookie(w, "", time.Time{})
 }
 
 // clearAllUserSessions removes all sessions for a specific user (used when password changes)
@@ -315,7 +330,7 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return strings.Contains(accept, "application/json")
 		}
 
-		c, err := r.Cookie("session_token")
+		c, err := r.Cookie(sessionCookieName)
 		if err != nil {
 			if err == http.ErrNoCookie {
 				if isAjaxRequest(r) {
@@ -341,15 +356,7 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Update cookie expiration to match session
-		http.SetCookie(w, &http.Cookie{
-			Name:     "session_token",
-			Value:    c.Value,
-			Expires:  time.Now().Add(sessionDuration),
-			HttpOnly: true,
-			Secure:   false, // Set to true in production with HTTPS
-			SameSite: http.SameSiteLaxMode,
-			Path:     "/",
-		})
+		setSessionCookie(w, c.Value, time.Now().Add(sessionDuration))
 
 		ctx := context.WithValue(r.Context(), userContextKey, user)
 		next.ServeHTTP(w, r.WithContext(ctx))

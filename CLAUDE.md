@@ -95,7 +95,10 @@ wsl CGO_ENABLED=1 go build -o gemini-pwd       # Windows via WSL
 ## Required Environment
 
 - `PWD_SECRET_KEY` - **Required**, exactly 32 bytes for AES-256. Fatal error if missing.
+- `PWD_DB_FILE` - **Required**, absolute path to the SQLite database file. No default; fatal error if missing or relative.
 - `PORT` - Optional, defaults to 7000
+- `PWD_BIND_ADDR` - Optional, defaults to `127.0.0.1` (loopback; production runs behind an HTTPS proxy)
+- `PWD_INSECURE_COOKIES` - Optional, `1` drops the `Secure` cookie flag (plain-HTTP dev only)
 
 ## Default Credentials
 
