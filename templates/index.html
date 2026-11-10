@@ -396,6 +396,7 @@
             passwordForm.reset();
             passwordID.value = '';
             passwordTagsContainer.innerHTML = '';
+            delete passwordValue.dataset.loadedFor;
             // Reset validation state
             passwordSiteValidation.classList.add('hidden');
             passwordUsernameValidation.classList.add('hidden');
@@ -414,6 +415,13 @@
             if (typeof resetPasswordToggles === 'function') {
                 resetPasswordToggles();
             }
+            // New passwords start visible so the user can see what they type
+            passwordValue.type = 'text';
+            const passwordValueIcon = document.querySelector('.toggle-password-visibility[data-target="passwordValue"] i');
+            if (passwordValueIcon) {
+                passwordValueIcon.classList.remove('fa-eye');
+                passwordValueIcon.classList.add('fa-eye-slash');
+            }
             // Refresh available tags to show all tags
             refreshAvailableTags();
             passwordModal.classList.remove('hidden');
@@ -423,6 +431,33 @@
                 performRealTimeValidation();
             }, 100);
         });
+
+        // In edit mode the password field starts blank. The first time the user
+        // clicks "show password" on an empty field, load the existing password.
+        // (The generic toggle in base.html flips the input type; this only fills the value.)
+        const passwordValueToggle = document.querySelector('.toggle-password-visibility[data-target="passwordValue"]');
+        if (passwordValueToggle) {
+            passwordValueToggle.addEventListener('click', async () => {
+                const id = passwordID.value;
+                if (!id || passwordValue.value !== '' || passwordValue.dataset.loadedFor === id) return;
+                passwordValue.dataset.loadedFor = id;
+                try {
+                    const response = await authFetch(API_ORIGIN + '/api/passwords?id=' + id + '&action=copy');
+                    if (!response) return; // Auth error handled by authFetch
+                    if (!response.ok) throw new Error('Failed to load password.');
+                    const existing = await response.text();
+                    // Ignore if the modal moved on to another entry or the user typed meanwhile
+                    if (passwordID.value === id && passwordValue.value === '') {
+                        passwordValue.value = existing;
+                        performRealTimeValidation();
+                    }
+                } catch (err) {
+                    delete passwordValue.dataset.loadedFor;
+                    console.error(err);
+                    alert(String(err));
+                }
+            });
+        }
 
         // Handle form submissions for passwords
         passwordForm.addEventListener('submit', async (e) => {
@@ -681,6 +716,19 @@
         passwordValue.addEventListener('input', performRealTimeValidation);
         passwordNotes.addEventListener('input', performRealTimeValidation);
 
+        // In the edit dialog, append "*" to the title once the user modifies any
+        // field or the tag list, so it's clear there are unsaved changes.
+        function markPasswordFormModified() {
+            if (passwordID.value && passwordModalTitle.textContent === 'Edit Password') {
+                passwordModalTitle.textContent = 'Edit Password*';
+            }
+        }
+        [passwordSite, passwordUsername, passwordValue, passwordNotes].forEach(field => {
+            field.addEventListener('input', markPasswordFormModified);
+        });
+        const passwordTagsObserver = new MutationObserver(markPasswordFormModified);
+        passwordTagsObserver.observe(passwordTagsContainer, { childList: true });
+
         // Drag and drop for tags
         document.getElementById('tagList')?.addEventListener('dragstart', (e) => {
             if (e.target.classList.contains('tag-item')) {
@@ -770,6 +818,7 @@
                 passwordSite.value = password.site;
                 passwordUsername.value = password.username;
                 passwordValue.value = ''; // Clear password field for security
+                delete passwordValue.dataset.loadedFor; // Allow "show" to load this entry's password
                 passwordNotes.value = password.notes || '';
                 
                 // Clear and populate tags
@@ -800,6 +849,8 @@
                 
                 // Sort the password tags
                 sortTagsInContainer(passwordTagsContainer);
+                // Populating tags isn't a user change; drop the queued mutation records
+                passwordTagsObserver.takeRecords();
                 
                 // Refresh available tags to exclude already used ones
                 refreshAvailableTags();
