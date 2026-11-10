@@ -65,8 +65,11 @@
                     </div>
                     <div class="mb-4 relative">
                         <label for="passwordValue" class="block text-gray-700 text-sm font-bold mb-2 text-left">Password</label>
-                        <input type="password" id="passwordValue" name="password" maxlength="128" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                        <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="passwordValue">
+                        <input type="password" id="passwordValue" name="password" maxlength="128" class="shadow appearance-none border rounded w-full py-2 pl-3 pr-16 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        <span id="loadCurrentPasswordBtn" class="absolute right-10 top-9 cursor-pointer text-gray-500 hover:text-gray-700 hidden" title="Load current password" role="button" aria-label="Load current password">
+                            <i class="fas fa-undo-alt"></i>
+                        </span>
+                        <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="passwordValue" title="Show/hide password">
                             <i class="fas fa-eye"></i>
                         </span>
                         <div id="passwordValueValidation" class="text-sm mt-1 hidden"></div>
@@ -229,6 +232,7 @@
         const passwordSite = document.getElementById('passwordSite');
         const passwordUsername = document.getElementById('passwordUsername');
         const passwordValue = document.getElementById('passwordValue');
+        const loadCurrentPasswordBtn = document.getElementById('loadCurrentPasswordBtn');
         const passwordNotes = document.getElementById('passwordNotes');
         const passwordTagsContainer = document.getElementById('passwordTagsContainer');
         
@@ -396,7 +400,7 @@
             passwordForm.reset();
             passwordID.value = '';
             passwordTagsContainer.innerHTML = '';
-            delete passwordValue.dataset.loadedFor;
+            loadCurrentPasswordBtn.classList.add('hidden'); // Nothing to load for a new entry
             // Reset validation state
             passwordSiteValidation.classList.add('hidden');
             passwordUsernameValidation.classList.add('hidden');
@@ -432,32 +436,27 @@
             }, 100);
         });
 
-        // In edit mode the password field starts blank. The first time the user
-        // clicks "show password" on an empty field, load the existing password.
-        // (The generic toggle in base.html flips the input type; this only fills the value.)
-        const passwordValueToggle = document.querySelector('.toggle-password-visibility[data-target="passwordValue"]');
-        if (passwordValueToggle) {
-            passwordValueToggle.addEventListener('click', async () => {
-                const id = passwordID.value;
-                if (!id || passwordValue.value !== '' || passwordValue.dataset.loadedFor === id) return;
-                passwordValue.dataset.loadedFor = id;
-                try {
-                    const response = await authFetch(API_ORIGIN + '/api/passwords?id=' + id + '&action=copy');
-                    if (!response) return; // Auth error handled by authFetch
-                    if (!response.ok) throw new Error('Failed to load password.');
-                    const existing = await response.text();
-                    // Ignore if the modal moved on to another entry or the user typed meanwhile
-                    if (passwordID.value === id && passwordValue.value === '') {
-                        passwordValue.value = existing;
-                        performRealTimeValidation();
-                    }
-                } catch (err) {
-                    delete passwordValue.dataset.loadedFor;
-                    console.error(err);
-                    alert(String(err));
+        // In edit mode the password field starts blank. The "load current password"
+        // button fetches the stored password into the field, overwriting anything typed.
+        // Visibility is left to the eye toggle.
+        loadCurrentPasswordBtn.addEventListener('click', async () => {
+            const id = passwordID.value;
+            if (!id) return;
+            try {
+                const response = await authFetch(API_ORIGIN + '/api/passwords?id=' + id + '&action=copy');
+                if (!response) return; // Auth error handled by authFetch
+                if (!response.ok) throw new Error('Failed to load password.');
+                const existing = await response.text();
+                // Ignore if the modal moved on to another entry meanwhile
+                if (passwordID.value === id) {
+                    passwordValue.value = existing;
+                    performRealTimeValidation();
                 }
-            });
-        }
+            } catch (err) {
+                console.error(err);
+                alert(String(err));
+            }
+        });
 
         // Handle form submissions for passwords
         passwordForm.addEventListener('submit', async (e) => {
@@ -818,7 +817,7 @@
                 passwordSite.value = password.site;
                 passwordUsername.value = password.username;
                 passwordValue.value = ''; // Clear password field for security
-                delete passwordValue.dataset.loadedFor; // Allow "show" to load this entry's password
+                loadCurrentPasswordBtn.classList.remove('hidden');
                 passwordNotes.value = password.notes || '';
                 
                 // Clear and populate tags
