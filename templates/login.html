@@ -293,7 +293,8 @@
 
             // Check for session timeout message
             const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('reason') === 'idle') {
+            const reason = urlParams.get('reason');
+            if (reason === 'idle' || reason === 'session_expired') {
                 errorMessage.textContent = 'You have been logged out due to inactivity.';
                 errorModal.classList.remove('hidden');
             }

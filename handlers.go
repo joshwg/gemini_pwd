@@ -188,8 +188,22 @@ func recentPasswordsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // logoutHandler clears the user's session.
+// robotsHandler disallows all crawling. Paired with the X-Robots-Tag header set
+// in securityHeaders, which also keeps pages out of indexes when linked elsewhere.
+func robotsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+	_, _ = w.Write([]byte("User-agent: *\nDisallow: /\n"))
+}
+
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	clearSession(w, r)
+	// Preserve the idle-timeout reason so the login page can explain the logout.
+	// Only a fixed value is passed through, never the raw query string.
+	if r.URL.Query().Get("reason") == "idle" {
+		http.Redirect(w, r, "/?reason=idle", http.StatusSeeOther)
+		return
+	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 

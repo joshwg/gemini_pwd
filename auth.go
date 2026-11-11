@@ -295,6 +295,7 @@ func securityHeaders(next http.HandlerFunc) http.HandlerFunc {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("X-Robots-Tag", "noindex, nofollow")
 
 		// Updated CSP to allow required CDNs and inline styles/scripts
 		// Note: 'unsafe-eval' and 'unsafe-inline' are required for our inline scripts and reduce security

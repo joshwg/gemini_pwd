@@ -76,6 +76,9 @@ func main() {
 	// Static files
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
+	// Tell crawlers to stay out entirely; nothing here should be indexed
+	mux.HandleFunc("/robots.txt", robotsHandler)
+
 	// Public routes (with security headers)
 	mux.HandleFunc("/", securityHeaders(loginHandler))
 	mux.HandleFunc("/login", securityHeaders(loginHandler))

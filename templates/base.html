@@ -175,7 +175,8 @@
                     <p class="text-sm text-gray-500">You will be logged out due to inactivity in</p>
                     <p id="idleCountdown" class="text-3xl font-bold text-red-600 my-4">5:00</p>
                 </div>
-                <div class="mt-4">
+                <div class="mt-4 flex justify-center gap-3">
+                    <button id="idleLogoutBtn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:shadow-outline">Logout</button>
                     <button id="stayLoggedInBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:shadow-outline">Stay Logged In</button>
                 </div>
             </div>
@@ -541,9 +542,13 @@
                 });
             }
 
-            // Idle timeout functionality
+            // Idle timeout functionality.
+            // Uses wall-clock deadlines rather than counting ticks, because browsers
+            // throttle timers in background tabs (Chrome: as rarely as once a minute),
+            // which would otherwise stretch a 5-minute countdown far past 5 minutes.
             let idleTimer;
             let countdownInterval;
+            let logoutDeadline = 0; // ms timestamp when the countdown hits 0:00
             const IDLE_TIME = IDLE_TIME_MS;
             const WARNING_SECONDS = IDLE_WARNING_SECONDS;
 
@@ -552,33 +557,33 @@
                 clearInterval(countdownInterval);
                 hideIdleWarning();
 
-                // Single timer: show warning 5 minutes before logout
+                logoutDeadline = Date.now() + IDLE_TIME;
+                // Show warning WARNING_SECONDS before logout
                 idleTimer = setTimeout(showIdleWarning, IDLE_TIME - (WARNING_SECONDS * 1000));
             }
 
+            function secondsLeft() {
+                return Math.max(0, Math.ceil((logoutDeadline - Date.now()) / 1000));
+            }
+
             function showIdleWarning() {
-                let remaining = WARNING_SECONDS;
                 const modal = document.getElementById('idleWarningModal');
                 const countdownEl = document.getElementById('idleCountdown');
 
-                function updateCountdown() {
+                function tick() {
+                    const remaining = secondsLeft();
+                    if (remaining <= 0) {
+                        logoutUser('idle');
+                        return;
+                    }
                     const minutes = Math.floor(remaining / 60);
                     const seconds = remaining % 60;
                     countdownEl.textContent = minutes + ':' + String(seconds).padStart(2, '0');
                 }
 
-                updateCountdown();
                 modal.classList.remove('hidden');
-
-                countdownInterval = setInterval(() => {
-                    remaining--;
-                    if (remaining <= 0) {
-                        clearInterval(countdownInterval);
-                        logoutUser();
-                        return;
-                    }
-                    updateCountdown();
-                }, 1000);
+                tick();
+                countdownInterval = setInterval(tick, 1000);
             }
 
             function hideIdleWarning() {
@@ -586,17 +591,33 @@
                 if (modal) modal.classList.add('hidden');
             }
 
-            function logoutUser() {
+            function logoutUser(reason) {
+                clearTimeout(idleTimer);
                 clearInterval(countdownInterval);
-                window.location.href = '/logout';
+                hideIdleWarning();
+                window.location.href = reason ? '/logout?reason=' + encodeURIComponent(reason) : '/logout';
             }
+
+            // When a throttled background tab becomes visible again, catch up immediately
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState !== 'visible' || !logoutDeadline) return;
+                const remaining = secondsLeft();
+                const modal = document.getElementById('idleWarningModal');
+                if (remaining <= 0) {
+                    logoutUser('idle');
+                } else if (remaining <= WARNING_SECONDS && modal && modal.classList.contains('hidden')) {
+                    clearTimeout(idleTimer);
+                    showIdleWarning();
+                }
+            });
 
             // "Stay Logged In" button resets everything
             document.getElementById('stayLoggedInBtn').addEventListener('click', () => {
-                clearInterval(countdownInterval);
-                hideIdleWarning();
                 resetIdleTimer();
             });
+
+            // "Logout" button ends the session immediately
+            document.getElementById('idleLogoutBtn').addEventListener('click', () => logoutUser());
 
             // Track user activity (only reset when warning is not showing)
             const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
