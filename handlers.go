@@ -407,27 +407,24 @@ func passwordsAPIHandler(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/plain")
 				w.Write([]byte(decryptedPassword))
 				return
+			} else if action == "previous" {
+				// Return only the previous password value as plain text (for Revert)
+				previousPassword, err := getDecryptedPreviousPassword(currentUser.ID, id)
+				if err != nil {
+					logger.Error("Error decrypting previous password", err)
+					httputil.InternalServerError(w, "Failed to decrypt previous password", err)
+					return
+				}
+				if previousPassword == "" {
+					httputil.WriteError(w, "No previous password", http.StatusNotFound, nil)
+					return
+				}
+				w.Header().Set("Content-Type", "text/plain")
+				w.Write([]byte(previousPassword))
+				return
 			} else {
-				// For edit action, decrypt password and notes fields
-				decryptedPassword, err := getDecryptedPassword(currentUser.ID, id)
-				if err != nil {
-					logger.Error("Error decrypting password for edit", err)
-					httputil.InternalServerError(w, "Failed to decrypt password", err)
-					return
-				}
-
-				decryptedNotes, err := getDecryptedNotes(currentUser.ID, id)
-				if err != nil {
-					logger.Error("Error decrypting notes for edit", err)
-					httputil.InternalServerError(w, "Failed to decrypt notes", err)
-					return
-				}
-
-				// Populate the decrypted fields
-				password.Password = decryptedPassword
-				password.Notes = decryptedNotes
-
-				// Return the full password entry with decrypted password and notes
+				// For edit, return the entry with decrypted notes but without the
+				// password; the dialog fetches it via action=copy only when asked.
 				httputil.WriteJSON(w, password)
 				return
 			}

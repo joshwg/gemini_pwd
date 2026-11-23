@@ -268,7 +268,8 @@ func TestPasswordsAPIHandler(t *testing.T) {
 		t.Errorf("Expected username 'tester', got '%s'", createdPassword.Username)
 	}
 
-	// Test GET individual password for editing (should include decrypted fields)
+	// Test GET individual password for editing (decrypted notes, but no password;
+	// the password is fetched on demand via action=copy)
 	req = newRequestWithUser("GET", fmt.Sprintf("/api/passwords?id=%d&action=edit", passwordID), "", user)
 	rr = httptest.NewRecorder()
 	passwordsAPIHandler(rr, req)
@@ -283,8 +284,11 @@ func TestPasswordsAPIHandler(t *testing.T) {
 		t.Fatalf("Failed to parse fetched password response: %v", err)
 	}
 
-	if fetchedPassword.Password != "testpassword123" {
-		t.Errorf("Expected decrypted password 'testpassword123', got '%s'", fetchedPassword.Password)
+	if fetchedPassword.Password != "" || strings.Contains(rr.Body.String(), "testpassword123") {
+		t.Errorf("Edit response should not include the password, got body: %s", rr.Body.String())
+	}
+	if fetchedPassword.HasPreviousPassword {
+		t.Error("New entry should not report a previous password")
 	}
 	if fetchedPassword.Notes != "test notes" {
 		t.Errorf("Expected decrypted notes 'test notes', got '%s'", fetchedPassword.Notes)
@@ -314,6 +318,22 @@ func TestPasswordsAPIHandler(t *testing.T) {
 		t.Errorf("PUT response body: %s", rr.Body.String())
 	}
 
+	// The load-password button (action=copy) returns the new password, and
+	// Revert (action=previous) returns the replaced one
+	for _, tc := range []struct{ action, want string }{
+		{"copy", "newpassword456"},
+		{"previous", "testpassword123"},
+	} {
+		req = newRequestWithUser("GET", fmt.Sprintf("/api/passwords?id=%d&action=%s", passwordID, tc.action), "", user)
+		rr = httptest.NewRecorder()
+		passwordsAPIHandler(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Errorf("GET action=%s returned status %v, want %v", tc.action, rr.Code, http.StatusOK)
+		} else if body := strings.TrimSpace(rr.Body.String()); body != tc.want {
+			t.Errorf("GET action=%s: expected %q, got %q", tc.action, tc.want, body)
+		}
+	}
+
 	// Verify the update by fetching again
 	req = newRequestWithUser("GET", fmt.Sprintf("/api/passwords?id=%d&action=edit", passwordID), "", user)
 	rr = httptest.NewRecorder()
@@ -332,8 +352,8 @@ func TestPasswordsAPIHandler(t *testing.T) {
 		if updatedPassword.Username != "updated-tester" {
 			t.Errorf("Expected updated username 'updated-tester', got '%s'", updatedPassword.Username)
 		}
-		if updatedPassword.Password != "newpassword456" {
-			t.Errorf("Expected updated password 'newpassword456', got '%s'", updatedPassword.Password)
+		if !updatedPassword.HasPreviousPassword {
+			t.Error("Changed entry should report a previous password")
 		}
 		if updatedPassword.Notes != "updated notes" {
 			t.Errorf("Expected updated notes 'updated notes', got '%s'", updatedPassword.Notes)

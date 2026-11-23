@@ -52,6 +52,7 @@ func initDB(filepath string) {
 		site TEXT NOT NULL,
 		username TEXT NOT NULL,
 		password_encrypted BLOB,
+		previous_password_encrypted BLOB,
 		notes_encrypted BLOB,
 		salt BLOB NOT NULL,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -149,6 +150,23 @@ func applyMigrations() {
 			if err != nil {
 				logger.Warning("Failed to update existing modified_at values: " + err.Error())
 			}
+		}
+	}
+
+	// Migration 2: Add previous_password_encrypted column so a changed password can be reverted
+	columnExists = 0
+	err = db.QueryRow(`
+		SELECT COUNT(*) FROM pragma_table_info('password_entries')
+		WHERE name = 'previous_password_encrypted'
+	`).Scan(&columnExists)
+	if err != nil {
+		logger.Warning("Failed to check for previous_password_encrypted column: " + err.Error())
+	} else if columnExists == 0 {
+		_, err = db.Exec("ALTER TABLE password_entries ADD COLUMN previous_password_encrypted BLOB")
+		if err != nil {
+			logger.Warning("Failed to add previous_password_encrypted column: " + err.Error())
+		} else {
+			logger.Info("Applied migration: Added previous_password_encrypted column to password_entries")
 		}
 	}
 }

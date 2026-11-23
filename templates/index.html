@@ -63,15 +63,20 @@
                         <input type="text" id="passwordUsername" name="username" maxlength="128" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
                         <div id="passwordUsernameValidation" class="text-sm mt-1 hidden"></div>
                     </div>
-                    <div class="mb-4 relative">
+                    <div class="mb-4">
                         <label for="passwordValue" class="block text-gray-700 text-sm font-bold mb-2 text-left">Password</label>
-                        <input type="password" id="passwordValue" name="password" maxlength="128" class="shadow appearance-none border rounded w-full py-2 pl-3 pr-16 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                        <span id="loadCurrentPasswordBtn" class="absolute right-10 top-9 cursor-pointer text-gray-500 hover:text-gray-700 hidden" title="Load current password" role="button" aria-label="Load current password">
-                            <i class="fas fa-undo-alt"></i>
-                        </span>
-                        <span class="absolute right-3 top-9 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="passwordValue" title="Show/hide password">
-                            <i class="fas fa-eye"></i>
-                        </span>
+                        <div class="flex items-center gap-2">
+                            <div class="relative flex-1">
+                                <input type="password" id="passwordValue" name="password" maxlength="128" class="shadow appearance-none border rounded w-full py-2 pl-3 pr-16 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                                <span id="loadCurrentPasswordBtn" class="absolute right-10 top-1/2 transform -translate-y-1/2 cursor-pointer text-gray-500 hover:text-gray-700 hidden" title="Load current password" role="button" aria-label="Load current password">
+                                    <i class="fas fa-undo-alt"></i>
+                                </span>
+                                <span class="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer text-gray-500 hover:text-gray-700 toggle-password-visibility" data-target="passwordValue" title="Show/hide password">
+                                    <i class="fas fa-eye"></i>
+                                </span>
+                            </div>
+                            <button type="button" id="revertPasswordBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline whitespace-nowrap disabled:bg-gray-400 disabled:hover:bg-gray-400 disabled:cursor-not-allowed" title="No previous password stored" disabled><i class="fas fa-history mr-2"></i>Revert</button>
+                        </div>
                         <div id="passwordValueValidation" class="text-sm mt-1 hidden"></div>
                     </div>
                     <div class="mb-4">
@@ -233,6 +238,7 @@
         const passwordUsername = document.getElementById('passwordUsername');
         const passwordValue = document.getElementById('passwordValue');
         const loadCurrentPasswordBtn = document.getElementById('loadCurrentPasswordBtn');
+        const revertPasswordBtn = document.getElementById('revertPasswordBtn');
         const passwordNotes = document.getElementById('passwordNotes');
         const passwordTagsContainer = document.getElementById('passwordTagsContainer');
         
@@ -401,6 +407,7 @@
             passwordID.value = '';
             passwordTagsContainer.innerHTML = '';
             loadCurrentPasswordBtn.classList.add('hidden'); // Nothing to load for a new entry
+            setRevertButtonState(false); // New entries have no previous password
             // Reset validation state
             passwordSiteValidation.classList.add('hidden');
             passwordUsernameValidation.classList.add('hidden');
@@ -450,6 +457,37 @@
                 // Ignore if the modal moved on to another entry meanwhile
                 if (passwordID.value === id) {
                     passwordValue.value = existing;
+                    performRealTimeValidation();
+                }
+            } catch (err) {
+                console.error(err);
+                alert(String(err));
+            }
+        });
+
+        // Enable the Revert button only when the entry has a previous password stored.
+        function setRevertButtonState(enabled) {
+            revertPasswordBtn.disabled = !enabled;
+            revertPasswordBtn.classList.toggle('opacity-50', !enabled);
+            revertPasswordBtn.classList.toggle('cursor-not-allowed', !enabled);
+            revertPasswordBtn.title = enabled
+                ? 'Load the previous password into the field (click Save to apply)'
+                : 'No previous password stored';
+        }
+
+        // Revert fetches the previous password into the field. Saving then makes it the
+        // current password, and the server keeps the replaced one as the new previous password.
+        revertPasswordBtn.addEventListener('click', async () => {
+            const id = passwordID.value;
+            if (!id || revertPasswordBtn.disabled) return;
+            try {
+                const response = await authFetch(API_ORIGIN + '/api/passwords?id=' + id + '&action=previous');
+                if (!response) return; // Auth error handled by authFetch
+                if (!response.ok) throw new Error('Failed to load previous password.');
+                const previous = await response.text();
+                // Ignore if the modal moved on to another entry meanwhile
+                if (passwordID.value === id) {
+                    passwordValue.value = previous;
                     performRealTimeValidation();
                 }
             } catch (err) {
@@ -818,6 +856,7 @@
                 passwordUsername.value = password.username;
                 passwordValue.value = ''; // Clear password field for security
                 loadCurrentPasswordBtn.classList.remove('hidden');
+                setRevertButtonState(!!password.hasPreviousPassword);
                 passwordNotes.value = password.notes || '';
                 
                 // Clear and populate tags

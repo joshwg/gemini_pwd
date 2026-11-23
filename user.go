@@ -522,6 +522,35 @@ func getDecryptedNotes(userID, passwordID int) (string, error) {
 	return "", nil
 }
 
+// getDecryptedPreviousPassword retrieves and decrypts the previous password for a
+// specific user and password ID. Returns "" if no previous password is stored.
+func getDecryptedPreviousPassword(userID, passwordID int) (string, error) {
+	var previousEncrypted, salt []byte
+
+	err := db.QueryRow(`
+		SELECT previous_password_encrypted, salt
+		FROM password_entries
+		WHERE id = ? AND user_id = ?`,
+		passwordID, userID).Scan(&previousEncrypted, &salt)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", fmt.Errorf("password not found or access denied")
+		}
+		return "", fmt.Errorf("failed to query previous password: %w", err)
+	}
+
+	if len(previousEncrypted) > 0 {
+		decrypted, err := decrypt(previousEncrypted, salt)
+		if err != nil {
+			return "", fmt.Errorf("failed to decrypt previous password: %w", err)
+		}
+		return string(decrypted), nil
+	}
+
+	return "", nil
+}
+
 // createPasswordEntry creates a new password entry.
 func createPasswordEntry(userID int, site, username, password, notes string, tagNames []string) error {
 	// Check for existing password entry (unique by site and username)
@@ -636,12 +665,32 @@ func updatePasswordEntry(userID, id int, site, username, password, notes string,
 	}
 
 	if password != "" {
-		// Update with new password
+		// Update with new password. If it differs from the current one, keep the
+		// current one as the previous password so the change can be reverted.
+		// Saving an unchanged password leaves the stored previous password alone.
+		var currentEncrypted []byte
+		err = tx.QueryRow("SELECT password_encrypted FROM password_entries WHERE id = ? AND user_id = ?", id, userID).Scan(&currentEncrypted)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve current password: %w", err)
+		}
+		changed := true
+		if len(currentEncrypted) > 0 {
+			current, err := decrypt(currentEncrypted, salt)
+			if err != nil {
+				return fmt.Errorf("failed to decrypt current password: %w", err)
+			}
+			changed = string(current) != password
+		}
+
 		encryptedPassword, err := encrypt([]byte(password), salt)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt password: %w", err)
 		}
-		_, err = tx.Exec("UPDATE password_entries SET site = ?, username = ?, password_encrypted = ?, notes_encrypted = ?, modified_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?", site, username, encryptedPassword, encryptedNotes, id, userID)
+		if changed {
+			_, err = tx.Exec("UPDATE password_entries SET site = ?, username = ?, password_encrypted = ?, previous_password_encrypted = password_encrypted, notes_encrypted = ?, modified_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?", site, username, encryptedPassword, encryptedNotes, id, userID)
+		} else {
+			_, err = tx.Exec("UPDATE password_entries SET site = ?, username = ?, password_encrypted = ?, notes_encrypted = ?, modified_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?", site, username, encryptedPassword, encryptedNotes, id, userID)
+		}
 		if err != nil {
 			return fmt.Errorf("failed to update password entry: %w", err)
 		}
@@ -746,15 +795,18 @@ func getAllDecryptedPasswords(userID int) ([]PasswordEntry, error) {
 	return passwords, nil
 }
 
-// getPasswordByID retrieves a password by its ID and decrypts it.
+// getPasswordByID retrieves a password entry by its ID with decrypted notes.
+// The password itself is deliberately not read or decrypted; callers that need
+// it fetch it on demand with getDecryptedPassword.
 func getPasswordByID(userID, id int) (*PasswordEntry, error) {
 	var p PasswordEntry
-	var encryptedPassword, encryptedNotes, salt []byte
+	var encryptedNotes, salt []byte
 	var tagIDs, tagNames, tagColors sql.NullString
 
 	sqlQuery := `
 		SELECT
-			pe.id, pe.site, pe.username, pe.password_encrypted, pe.notes_encrypted, pe.salt, pe.created_at, pe.modified_at,
+			pe.id, pe.site, pe.username, pe.notes_encrypted, pe.salt, pe.created_at, pe.modified_at,
+			COALESCE(LENGTH(pe.previous_password_encrypted), 0) > 0 as hasPrevious,
 			GROUP_CONCAT(t.id) as tagIDs,
 			GROUP_CONCAT(t.name) as tagNames, 
 			GROUP_CONCAT(t.color) as tagColors
@@ -769,7 +821,7 @@ func getPasswordByID(userID, id int) (*PasswordEntry, error) {
 		GROUP BY
 			pe.id
 	`
-	err := db.QueryRow(sqlQuery, userID, id).Scan(&p.ID, &p.Site, &p.Username, &encryptedPassword, &encryptedNotes, &salt, &p.CreatedAt, &p.ModifiedAt, &tagIDs, &tagNames, &tagColors)
+	err := db.QueryRow(sqlQuery, userID, id).Scan(&p.ID, &p.Site, &p.Username, &encryptedNotes, &salt, &p.CreatedAt, &p.ModifiedAt, &p.HasPreviousPassword, &tagIDs, &tagNames, &tagColors)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve password: %w", err)
 	}
@@ -796,13 +848,7 @@ func getPasswordByID(userID, id int) (*PasswordEntry, error) {
 		p.Tags = []Tag{}
 	}
 
-	// Decrypt the password and notes
-	decryptedPassword, err := decrypt(encryptedPassword, salt)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt password: %w", err)
-	}
-	p.Password = string(decryptedPassword)
-
+	// Decrypt the notes
 	decryptedNotes, err := decrypt(encryptedNotes, salt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt notes: %w", err)

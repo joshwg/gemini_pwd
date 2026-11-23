@@ -201,3 +201,77 @@ func TestUpdatePasswordEntryWithNoNote(t *testing.T) {
 		t.Errorf("Expected empty notes after decryption, but got '%s'", decryptedNotes)
 	}
 }
+
+// TestUpdatePasswordEntryKeepsPreviousPassword verifies that changing a password
+// stores the old one as the previous password, that re-saving an unchanged
+// password leaves the previous password alone, and that reverting swaps them.
+func TestUpdatePasswordEntryKeepsPreviousPassword(t *testing.T) {
+	ensureTestDB()
+
+	admin := &User{ID: 1, Username: "admin", IsAdmin: true}
+	if err := createUser(admin, "prevuser", "password123", false, true); err != nil {
+		t.Fatalf("Failed to create user: %v", err)
+	}
+	var userID int
+	if err := db.QueryRow("SELECT id FROM users WHERE username = 'prevuser'").Scan(&userID); err != nil {
+		t.Fatalf("Failed to get user ID: %v", err)
+	}
+
+	if err := createPasswordEntry(userID, "example.com", "me", "first", "", nil); err != nil {
+		t.Fatalf("Failed to create entry: %v", err)
+	}
+	var entryID int
+	if err := db.QueryRow("SELECT id FROM password_entries WHERE user_id = ?", userID).Scan(&entryID); err != nil {
+		t.Fatalf("Failed to get entry ID: %v", err)
+	}
+
+	check := func(step, wantCurrent, wantPrevious string) {
+		t.Helper()
+		current, err := getDecryptedPassword(userID, entryID)
+		if err != nil {
+			t.Fatalf("%s: getDecryptedPassword: %v", step, err)
+		}
+		previous, err := getDecryptedPreviousPassword(userID, entryID)
+		if err != nil {
+			t.Fatalf("%s: getDecryptedPreviousPassword: %v", step, err)
+		}
+		entry, err := getPasswordByID(userID, entryID)
+		if err != nil {
+			t.Fatalf("%s: getPasswordByID: %v", step, err)
+		}
+		if current != wantCurrent || previous != wantPrevious {
+			t.Errorf("%s: got current=%q previous=%q, want current=%q previous=%q", step, current, previous, wantCurrent, wantPrevious)
+		}
+		if entry.Password != "" {
+			t.Errorf("%s: getPasswordByID returned the password; it should be fetched on demand", step)
+		}
+		if entry.HasPreviousPassword != (wantPrevious != "") {
+			t.Errorf("%s: HasPreviousPassword=%v, want %v", step, entry.HasPreviousPassword, wantPrevious != "")
+		}
+	}
+
+	check("new entry", "first", "")
+
+	// Blank password keeps the current one and doesn't touch previous
+	if err := updatePasswordEntry(userID, entryID, "example.com", "me", "", "note", nil); err != nil {
+		t.Fatalf("update with blank password: %v", err)
+	}
+	check("blank password", "first", "")
+
+	if err := updatePasswordEntry(userID, entryID, "example.com", "me", "second", "", nil); err != nil {
+		t.Fatalf("change password: %v", err)
+	}
+	check("changed", "second", "first")
+
+	// Saving the same password (e.g. after loading the current one) keeps previous
+	if err := updatePasswordEntry(userID, entryID, "example.com", "me", "second", "", nil); err != nil {
+		t.Fatalf("resave password: %v", err)
+	}
+	check("unchanged", "second", "first")
+
+	// Revert: saving the previous password swaps the two
+	if err := updatePasswordEntry(userID, entryID, "example.com", "me", "first", "", nil); err != nil {
+		t.Fatalf("revert password: %v", err)
+	}
+	check("reverted", "first", "second")
+}
